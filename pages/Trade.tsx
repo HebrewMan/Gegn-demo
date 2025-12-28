@@ -4,7 +4,8 @@ import { useParams, Link, useLocation } from 'react-router-dom';
 import { 
   ArrowLeft, Share2, Activity, Settings, ChevronDown, ChevronUp, List, 
   ShieldAlert, User, ShieldCheck, Zap, Maximize2, Terminal, Info, Globe, Twitter, Send,
-  MousePointer2, Flame, Lock, Eye, AlertTriangle, Boxes, Copy, ExternalLink, Search
+  MousePointer2, Flame, Lock, Eye, AlertTriangle, Boxes, Copy, ExternalLink, Search,
+  Star, Edit, MessageCircle, BarChart3, ThumbsUp, ChefHat, Crown, Clock
 } from 'lucide-react';
 import TradingChart from '../components/TradingChart';
 import { getPairsByAddress, getMockHistoricalData, getKlineDataFromDexScreener, getKlineData } from '../services/dexScreener';
@@ -296,45 +297,133 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
       {/* Left Main View */}
       <div className="flex-1 flex flex-col min-w-0 border-r border-gray-800 h-full overflow-hidden">
         <div className="flex flex-col flex-shrink-0">
-          <div className="h-16 px-4 border-b border-gray-800 flex items-center justify-between bg-[#0a0b0d] flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <Link to="/" className="p-1.5 hover:bg-white/5 rounded-lg transition-colors text-gray-500">
-                <ArrowLeft className="w-5 h-5" />
-              </Link>
-              <div className="w-10 h-10 rounded-lg bg-[#1a1b1f] border border-white/5 flex items-center justify-center text-xl font-bold overflow-hidden">
-                <img src={tokenImage} alt={tokenSymbol} className="w-full h-full object-cover" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="font-bold text-[15px] flex items-center gap-1.5 text-white">
-                    {tokenSymbol} <span className="text-[#00ffa3] font-black">{tokenName}</span>
-                  </h1>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[9px] text-gray-400 font-bold uppercase px-1 py-0.5 rounded bg-white/5 border border-white/10">BSC</span>
-                    <span className="text-[10px] text-red-400 font-mono font-bold tracking-tighter">23h</span>
-                    <div className="flex gap-2 items-center px-1 text-gray-500">
-                      <Globe className="w-3.5 h-3.5 cursor-pointer hover:text-white" />
-                      <Twitter className="w-3.5 h-3.5 cursor-pointer hover:text-white" />
-                      <Send className="w-3.5 h-3.5 cursor-pointer hover:text-white" />
+          <div className="px-4 py-3 border-b border-gray-800 bg-[#0a0b0d] flex-shrink-0">
+            <div className="flex items-center justify-between gap-3">
+              {/* Left: All data elements */}
+              <div className="flex items-center gap-3 flex-1">
+                {/* Star icon */}
+                <button className="p-1 hover:bg-white/5 rounded transition-colors text-gray-400 hover:text-yellow-400">
+                  <Star className="w-4 h-4" />
+                </button>
+                
+                {/* Badge with token logo and overlapping icons */}
+                <div className="relative flex-shrink-0">
+                  {/* Main badge with token logo */}
+                  <div className="rounded-lg border-2 border-[#00ffa3] bg-[#0a0b0d] relative flex items-center gap-2">
+                    {/* Token logo image */}
+                    <div className="w-10 h-10 rounded-lg bg-[#1a1b1f] border border-white/5 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {tokenImage ? (
+                        <img 
+                          src={tokenImage} 
+                          alt={tokenSymbol}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent && !parent.querySelector('span')) {
+                              const fallback = document.createElement('span');
+                              fallback.className = 'text-[10px]';
+                              fallback.textContent = tokenSymbol?.slice(0, 2).toUpperCase() || '💰';
+                              parent.appendChild(fallback);
+                            }
+                          }}
+                        />
+                      ) : (
+                        <span className="text-[10px]">{tokenSymbol?.slice(0, 2).toUpperCase() || '💰'}</span>
+                      )}
+                    </div>
+                    {/* Thumbs up icon overlapping bottom-right */}
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#00ffa3] flex items-center justify-center">
+                      <ThumbsUp className="w-2.5 h-2.5 text-black" />
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-[11px] font-mono">
-                   <span className="text-yellow-500 font-bold">{tokenPrice}</span>
-                   <span className={`font-bold ${priceChange24h >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                     {priceChange24h >= 0 ? '+' : ''}{priceChange24h.toFixed(2)}%
-                   </span>
+
+                {/* Token info - two rows */}
+                <div className="flex flex-col gap-1">
+                  {/* First row: Token name and action icons */}
+                  <div className="flex items-center gap-2">
+                    <h1 className="font-bold text-lg text-white">
+                      {tokenName}
+                    </h1>
+                    <span className="text-gray-400 text-sm">{tokenName}</span>
+                    <div className="flex items-center gap-1">
+                      <button className="p-1 hover:bg-white/5 rounded text-gray-400 hover:text-white transition-colors">
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                      <button className="p-1 hover:bg-white/5 rounded text-gray-400 hover:text-white transition-colors">
+                        <Boxes className="w-3.5 h-3.5" />
+                      </button>
+                      <button className="p-1 hover:bg-white/5 rounded text-gray-400 hover:text-white transition-colors">
+                        <Share2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button className="p-1 hover:bg-white/5 rounded text-gray-400 hover:text-white transition-colors">
+                        <User className="w-3.5 h-3.5" />
+                      </button>
+                      <button className="p-1 hover:bg-white/5 rounded text-gray-400 hover:text-white transition-colors">
+                        <MessageCircle className="w-3.5 h-3.5" />
+                      </button>
+                      <button className="p-1 hover:bg-white/5 rounded text-gray-400 hover:text-white transition-colors">
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  {/* Second row: Address and icons */}
+                  <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                    <span>1d</span>
+                    <span className="font-mono">{pairAddress ? `${pairAddress.slice(0, 4)}...${pairAddress.slice(-4)}` : '0x0a...4444'}</span>
+                    <User className="w-3 h-3 text-blue-400" />
+                    <User className="w-3 h-3 text-blue-400" />
+                    <AlertTriangle className="w-3 h-3 text-yellow-400" />
+                    <Send className="w-3 h-3 text-blue-400" />
+                    <BarChart3 className="w-3 h-3 text-blue-400" />
+                    <MessageCircle className="w-3 h-3 text-blue-400" />
+                    <Search className="w-3 h-3 text-gray-400" />
+                    <ChefHat className="w-3 h-3 text-blue-400" />
+                    <span>DS 3d</span>
+                    <Crown className="w-3 h-3 text-yellow-400" />
+                    <span>1/177</span>
+                  </div>
+                </div>
+
+                {/* Market cap - independent element */}
+                <div className="text-2xl font-bold text-white flex-shrink-0">
+                  ${pairInfo?.marketCap ? (pairInfo.marketCap >= 1000000 ? `${(pairInfo.marketCap / 1000000).toFixed(2)}M` : `${(pairInfo.marketCap / 1000).toFixed(1)}K`) : '214.55K'}
+                </div>
+
+                {/* Metrics table - four columns */}
+                <div className="flex items-center gap-6 flex-shrink-0">
+                <div className="flex flex-col gap-1 text-[11px]">
+                    <div className="text-gray-500 text-[10px] mb-1">价格</div>
+                    <div className="text-gray-300 font-mono">{tokenPrice}</div>
+                  </div>
+                  <div className="flex flex-col gap-1 text-[11px]">
+                    <div className="text-gray-500 text-[10px] mb-1">池子</div>
+                    <div className="text-gray-300 font-mono">${pairInfo?.liquidity?.usd ? (pairInfo.liquidity.usd >= 1000 ? `${(pairInfo.liquidity.usd / 1000).toFixed(1)}K` : pairInfo.liquidity.usd.toFixed(0)) : '61.1K'}</div>
+                  </div>
+                  <div className="flex flex-col gap-1 text-[11px]">
+                    <div className="text-gray-500 text-[10px] mb-1">24h 成交额</div>
+                    <div className="text-gray-300 font-mono">${pairInfo?.volume?.h24 ? (pairInfo.volume.h24 >= 1000 ? `${(pairInfo.volume.h24 / 1000).toFixed(1)}K` : pairInfo.volume.h24.toFixed(0)) : '857.2K'}</div>
+                  </div>
+                  <div className="flex flex-col gap-1 text-[11px]">
+                    <div className="text-gray-500 text-[10px] mb-1">总手续费</div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 bg-yellow-500 rounded flex items-center justify-center text-[8px] text-black font-bold">B</div>
+                      <span className="text-gray-300 font-mono">15.2</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1 text-[11px]">
+                    <div className="text-gray-500 text-[10px] mb-1">供应量</div>
+                    <div className="text-gray-300 font-mono">1B</div>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-               <div className="flex items-center gap-1 px-2 py-1 bg-green-500/10 border border-green-500/20 rounded text-[10px] text-green-500 font-bold uppercase">
-                 <ShieldCheck className="w-3 h-3" /> 安全
-               </div>
-               <div className="h-6 w-px bg-gray-800 mx-1"></div>
-               <button className="p-2 hover:bg-white/5 rounded-lg text-gray-500 hover:text-white"><Maximize2 className="w-4 h-4" /></button>
-               <button className="p-2 hover:bg-white/5 rounded-lg text-gray-500 hover:text-white"><Activity className="w-4 h-4" /></button>
-               <button className="p-2 hover:bg-white/5 rounded-lg text-gray-500 hover:text-white"><Settings className="w-4 h-4" /></button>
+
+              {/* Right: Only alarm clock icon */}
+              <button className="p-2 hover:bg-white/5 rounded border border-gray-800 flex-shrink-0">
+                <Clock className="w-4 h-4 text-gray-400" />
+              </button>
             </div>
           </div>
           
