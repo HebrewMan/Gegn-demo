@@ -56,8 +56,31 @@ export const getPairsByAddress = async (pairAddress: string): Promise<TokenPair[
 };
 
 export const searchPairs = async (query: string): Promise<TokenPair[]> => {
-  const data = await api.get<{ pairs: TokenPair[] }>(`${BASE_URL}/search?q=${query}`);
-  return data.pairs || [];
+  try {
+    // Validate query - check if it exists and has minimum length
+    if (!query || typeof query !== 'string') {
+      console.warn(`Invalid search query: "${query}"`);
+      return [];
+    }
+
+    const trimmedQuery = query.trim();
+    if (trimmedQuery.length < 2) {
+      console.warn(`Search query too short: "${query}"`);
+      return [];
+    }
+
+    const encodedQuery = encodeURIComponent(trimmedQuery);
+    const data = await api.get<{ pairs: TokenPair[] }>(`${BASE_URL}/search?q=${encodedQuery}`);
+    return data.pairs || [];
+  } catch (error: any) {
+    // Handle 400 Bad Request and other errors gracefully
+    if (error.response?.status === 400) {
+      console.warn(`DexScreener API returned 400 for query: "${query}"`);
+      return [];
+    }
+    console.error(`Error searching pairs for "${query}":`, error);
+    return [];
+  }
 };
 
 // Get trending tokens - try multiple sources

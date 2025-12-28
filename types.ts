@@ -105,6 +105,8 @@ export interface User {
   balance: number; // USDT balance
   createdAt: number;
   lastLoginAt: number;
+  // For wallet address display - use walletAddress if available, otherwise use id
+  displayAddress?: string;
 }
 
 export interface AuthResult {

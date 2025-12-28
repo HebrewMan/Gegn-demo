@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Star, Trophy, Smartphone, ChevronDown, Settings, Bell } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { User } from '../types';
+import { getUserBalance } from '../services/tradeService';
 import UserMenu from './UserMenu';
 import Logo from './Logo';
 
@@ -18,6 +19,23 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, currentUser, onOpenAuth, on
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [userBalance, setUserBalance] = useState<number>(0);
+
+  // Update balance when currentUser changes or periodically
+  useEffect(() => {
+    if (currentUser) {
+      const updateBalance = async () => {
+        const balance = await getUserBalance(currentUser.id);
+        setUserBalance(balance);
+      };
+      updateBalance();
+      // Update balance every 2 seconds
+      const interval = setInterval(updateBalance, 2000);
+      return () => clearInterval(interval);
+    } else {
+      setUserBalance(0);
+    }
+  }, [currentUser]);
 
   const navItems = [
     { label: '战壕', path: '/trenches' },
@@ -25,7 +43,7 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, currentUser, onOpenAuth, on
     { label: '跟单', path: '#' },
     { label: '监控', path: '#' },
     { label: '追踪', path: '#' },
-    { label: '资产', path: '#' },
+    { label: '资产', path: '/wallet' },
     { label: '奖励', path: '#' },
   ];
 
@@ -42,7 +60,9 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, currentUser, onOpenAuth, on
               key={item.label}
               to={item.path}
               className={`text-sm font-bold transition-colors ${
-                (location.pathname === item.path || (item.path === '/' && location.pathname === '/')) 
+                (location.pathname === item.path || 
+                 (item.path === '/' && location.pathname === '/') ||
+                 (item.path === '/wallet' && location.pathname === '/wallet'))
                 ? 'text-[#00ffa3]' : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -57,21 +77,15 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, currentUser, onOpenAuth, on
           <Search className="w-3.5 h-3.5 text-gray-500" />
           <input
             type="text"
-            placeholder="搜索代币名称, 合约, 钱包"
+            placeholder="搜索代币名称, 合约"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && searchQuery.trim()) {
                 const query = searchQuery.trim();
-                // Check if it's a wallet address (starts with 0x and has 42 characters)
-                if (query.startsWith('0x') && query.length === 42) {
-                  navigate(`/wallet/${query}`);
-                  setSearchQuery('');
-                } else {
-                  // Otherwise, search for token
-                  navigate(`/trade/${query}`);
-                  setSearchQuery('');
-                }
+                // Search for token
+                navigate(`/trade/${query}`);
+                setSearchQuery('');
               }
             }}
             className="bg-transparent border-none text-[11px] text-gray-300 focus:outline-none w-full ml-2 placeholder:text-gray-600"
@@ -107,7 +121,7 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, currentUser, onOpenAuth, on
                 {currentUser?.email || (currentUser?.walletAddress ? `${currentUser.walletAddress.slice(0, 6)}...${currentUser.walletAddress.slice(-4)}` : '')}
               </div>
               <div className="text-[10px] text-[#00ffa3] font-bold">
-                {currentUser?.balance.toFixed(2)} USDT
+                {userBalance.toFixed(2)} USDT
               </div>
               <button 
                 onClick={() => setShowUserMenu(true)} 

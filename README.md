@@ -2,19 +2,121 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+# GMGN.AI Clone - 单机版交易演示系统
 
-This contains everything you need to run your app locally.
+这是一个单机版的加密货币交易演示系统，模拟真实的代币交易流程。所有数据存储在本地（localStorage），无需后端服务器。
+
+## ⚠️ 重要说明
+
+**这是一个单机版应用**，所有用户数据、交易记录和持仓信息都存储在浏览器的 localStorage 中。数据不会同步到服务器，也不会与其他用户共享。
+
+## 🚀 快速开始
+
+### 环境要求
+
+- Node.js (推荐 v16 或更高版本)
+- npm 或 yarn
+
+### 安装步骤
+
+1. **安装依赖**
+   ```bash
+   npm install
+   ```
+
+2. **启动开发服务器**
+   ```bash
+   npm run dev
+   ```
+
+3. **访问应用**
+   
+   打开浏览器访问 `http://localhost:5173`（或终端显示的地址）
+
+## 📋 使用流程
+
+### 1. 注册账户
+
+- 点击右上角的"登录"按钮
+- 选择"注册"标签
+- 可以使用以下两种方式注册：
+  - **邮箱注册**：输入邮箱地址（会进行格式验证）
+  - **MetaMask 注册**：连接 MetaMask 钱包并签名验证
+
+> 💡 **新用户福利**：每个新注册的用户会自动获得 **1000 USDT** 的初始余额
+
+### 2. 选择交易对
+
+- 在"热门"页面浏览热门代币列表
+- 点击任意代币进入交易页面
+- 或者使用搜索框搜索代币名称或合约地址
+
+### 3. 进行交易
+
+#### 买入（BUY）
+- 在交易页面选择"买入"标签
+- 输入要购买的 USDT 金额
+- 可以使用快速选择按钮（100、500、1000、10000 USDT 或"全部"）
+- 点击"买入"按钮执行交易
+
+#### 卖出（SELL）
+- 切换到"卖出"标签
+- 输入要卖出的代币数量
+- 可以使用百分比快速选择（10%、25%、50%、100% 或"全部"）
+- 点击"卖出"按钮执行交易
+
+### 4. 查看资产
+
+- 点击右上角用户头像
+- 选择"我的资产"查看：
+  - **持有代币**：当前持仓的代币列表，包括余额、利润、持仓比例等
+  - **活动**：所有交易记录，包括买入/卖出历史
+
+### 5. 重置数据
+
+- 点击用户头像打开菜单
+- 点击"重置数据 (1000 USDT)"按钮
+- 这将清除所有交易记录和持仓，并将余额重置为 1000 USDT
+- 页面会自动刷新
+
+## 🎯 主要功能
+
+- ✅ **用户注册/登录**：支持邮箱和 MetaMask 两种方式
+- ✅ **热门代币列表**：实时显示热门代币价格和涨跌幅
+- ✅ **K 线图表**：支持 1m、1h、4h、1D 等时间周期切换
+- ✅ **实时交易**：买入/卖出代币，实时更新余额和持仓
+- ✅ **资产管理**：查看持仓、利润、交易记录
+- ✅ **数据重置**：一键重置所有数据，回到初始状态
+
+## 📊 数据存储
+
+所有数据存储在浏览器的 localStorage 中，包括：
+
+- `gmgn_users_json`：用户数据
+- `gmgn_trades_json`：交易记录
+- `gmgn_holdings_json`：持仓信息
+- `gmgn_current_user`：当前登录用户
+
+> ⚠️ **注意**：清除浏览器缓存或使用隐私模式会丢失所有数据
+
+## 🛠️ 技术栈
+
+- React + TypeScript
+- Vite
+- React Router
+- Tailwind CSS
+- Lightweight Charts (K 线图表)
+- DexScreener API (代币数据)
+- Binance API (K 线数据)
+
+## 📝 开发说明
+
+- 项目使用 Vite 作为构建工具
+- 所有 API 调用都在 `services/` 目录下
+- 组件位于 `components/` 目录
+- 页面位于 `pages/` 目录
+- 数据管理在 `data/database.ts` 中统一处理
+
+## 🔗 相关链接
 
 View your app in AI Studio: https://ai.studio/apps/drive/1b_8hu16st_xJVTO-mwAg7o00rXs6ze-B
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`

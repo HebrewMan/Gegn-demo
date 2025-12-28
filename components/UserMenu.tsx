@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
-import { X, Copy, RefreshCw, ArrowUpDown, Share2, ChevronRight, Infinity, Folder, Shield, DollarSign, LogOut, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Copy, RefreshCw, ArrowUpDown, Share2, ChevronRight, Infinity, Folder, Shield, DollarSign, LogOut, CheckCircle, RotateCcw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { User } from '../types';
+import { getUserBalance } from '../services/tradeService';
+import { resetDatabase } from '../data/database';
 
 interface UserMenuProps {
   user: User;
@@ -9,7 +12,20 @@ interface UserMenuProps {
 }
 
 const UserMenu: React.FC<UserMenuProps> = ({ user, onClose, onLogout }) => {
+  const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
+  const [userBalance, setUserBalance] = useState<number>(user.balance);
+
+  // Update balance periodically
+  useEffect(() => {
+    const updateBalance = async () => {
+      const balance = await getUserBalance(user.id);
+      setUserBalance(balance);
+    };
+    updateBalance();
+    const interval = setInterval(updateBalance, 2000);
+    return () => clearInterval(interval);
+  }, [user.id]);
 
   const handleCopyAddress = () => {
     const address = user.walletAddress || '';
@@ -35,7 +51,15 @@ const UserMenu: React.FC<UserMenuProps> = ({ user, onClose, onLogout }) => {
   ];
 
   const menuItems = [
-    { icon: <Folder className="w-5 h-5" />, label: '我的资产', onClick: () => {} },
+    { 
+      icon: <Folder className="w-5 h-5" />, 
+      label: '我的资产', 
+      onClick: () => {
+        // Navigate to wallet page
+        navigate('/wallet');
+        onClose();
+      }
+    },
     { 
       icon: <Shield className="w-5 h-5" />, 
       label: '账户安全', 
@@ -66,7 +90,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ user, onClose, onLogout }) => {
               </div>
               <div>
                 <div className="text-xl font-bold text-white">
-                  {user.balance.toFixed(4)} <span className="text-sm text-gray-400">$</span>
+                  ${userBalance.toFixed(4)} <span className="text-sm text-gray-400"></span>
                 </div>
               </div>
             </div>
@@ -141,6 +165,21 @@ const UserMenu: React.FC<UserMenuProps> = ({ user, onClose, onLogout }) => {
               <div className="text-white text-2xl">⭐</div>
             </div>
           </div>
+
+          {/* Reset Database Button */}
+          <button
+            onClick={() => {
+              if (confirm('确定要重置所有数据吗？这将清空所有交易记录和持仓，用户余额将重置为1000 USDT。')) {
+                resetDatabase();
+                alert('数据已重置！请刷新页面。');
+                window.location.reload();
+              }
+            }}
+            className="w-full flex items-center justify-center gap-2 p-3 bg-[#0a0b0d] rounded-lg border border-yellow-500/30 hover:border-yellow-500/50 hover:bg-yellow-500/10 transition-colors mb-3"
+          >
+            <RotateCcw className="w-4 h-4 text-yellow-400" />
+            <span className="text-sm text-yellow-400 font-medium">重置数据 (1000 USDT)</span>
+          </button>
 
           {/* Logout Button */}
           <button

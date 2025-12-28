@@ -39,14 +39,14 @@ const formatPrice = (price: number): string => {
   
   // For numbers >= 0 (positive), always show 7 decimal places
   if (!isNegative) {
-    return price.toFixed(7);
+    return price.toFixed(4);
   }
   
   // For negative numbers < 0, find the last zero after decimal point
   const priceStr = absPrice.toString();
   const decimalIndex = priceStr.indexOf('.');
   if (decimalIndex === -1) {
-    return price.toFixed(7);
+    return price.toFixed(4);
   }
   
   // Find the last zero after decimal point
@@ -69,7 +69,7 @@ const formatPrice = (price: number): string => {
   }
   
   // If no zero found after decimal, show 7 decimal places
-  return price.toFixed(7);
+  return price.toFixed(4);
 };
 
 const TradingChart: React.FC<TradingChartProps> = ({ data, symbol, interval = '1h', onIntervalChange }) => {
@@ -183,21 +183,24 @@ const TradingChart: React.FC<TradingChartProps> = ({ data, symbol, interval = '1
         ticksVisible: true,
       });
       
-      // Set price formatter - use a smart formatter that detects volume vs price
-      // Volume values are typically much larger than price values
-      // We'll use a threshold to distinguish: if value > 100, it's likely volume
+      // Set global localization - price formatter for price scale only
+      // Price scale (right scale) should always use formatPrice (no K/W/M format)
+      // Volume scale uses its own priceFormat from volumeSeries, which will format
+      // volume values with K/W/M notation through the volume priceFormat type
       chart.applyOptions({
         localization: {
           priceFormatter: (price: number) => {
-            // If price is very large (> 100), it's likely volume, use volume formatter
-            // Otherwise, it's a price, use price formatter
-            if (Math.abs(price) > 100) {
-              return formatVolume(price);
-            }
+            // Always use formatPrice for price scale (no K/W/M format)
+            // This formatter is used for the candlestick price scale (right scale)
             return formatPrice(price);
           },
         },
       });
+      
+      // Note: Volume scale will use the priceFormat from volumeSeries
+      // The volume priceFormat type handles volume-specific formatting
+      // We need to ensure volume values are formatted with K/W/M notation
+      // This is handled by the volumeSeries priceFormat configuration above
 
       // Add historical high price line (red dashed line)
       const highPriceLine = candlestickSeries.createPriceLine({

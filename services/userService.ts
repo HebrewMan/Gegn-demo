@@ -1,28 +1,40 @@
 import { User, AuthResult } from '../types';
+import { 
+  getUserByEmail, 
+  getUserByWalletAddress, 
+  getUserById as getUserByIdFromDb, 
+  upsertUser as upsertUserRecord,
+  type UserRecord 
+} from '../data/database';
 
-const USERS_STORAGE_KEY = 'gmgn_users_data';
-const INITIAL_USDT_BALANCE = 1000000;
+const INITIAL_USDT_BALANCE = 1000; // Changed to 1000 USDT as requested
 
-// Read users from localStorage (simulating JSON file)
-const readUsers = (): User[] => {
-  try {
-    const data = localStorage.getItem(USERS_STORAGE_KEY);
-    if (data) {
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    console.error('Error reading users data:', error);
-  }
-  return [];
+// Convert UserRecord to User (for compatibility)
+const userRecordToUser = (record: UserRecord): User => {
+  return {
+    id: record.user_id,
+    email: record.email,
+    walletAddress: record.wallet_address,
+    authType: record.auth_type || 'email',
+    balance: record.balance,
+    createdAt: record.created_at,
+    lastLoginAt: record.last_login_at,
+  };
 };
 
-// Write users to localStorage (simulating JSON file)
-const writeUsers = (users: User[]): void => {
-  try {
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users, null, 2));
-  } catch (error) {
-    console.error('Error writing users data:', error);
-  }
+// Convert User to UserRecord
+const userToUserRecord = (user: User): UserRecord => {
+  return {
+    user_id: user.id,
+    name: user.email?.split('@')[0] || user.walletAddress?.slice(0, 8) || 'User',
+    email: user.email,
+    wallet_address: user.walletAddress,
+    avatar: undefined,
+    balance: user.balance,
+    created_at: user.createdAt,
+    last_login_at: user.lastLoginAt,
+    auth_type: user.authType,
+  };
 };
 
 // Validate email format
@@ -41,29 +53,32 @@ export const registerWithEmail = async (email: string): Promise<AuthResult> => {
     };
   }
 
-  const users = readUsers();
-  
   // Check if user already exists
-  const existingUser = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
-  if (existingUser) {
+  const existingUserRecord = await getUserByEmail(email);
+  if (existingUserRecord) {
     return {
       success: false,
       message: '该邮箱已注册，请直接登录',
     };
   }
 
-  // Create new user
-  const newUser: User = {
-    id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+  // Create new user record
+  const newUserRecord: UserRecord = {
+    user_id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    name: email.split('@')[0],
     email: email.toLowerCase(),
-    authType: 'email',
+    wallet_address: undefined,
+    avatar: undefined,
     balance: INITIAL_USDT_BALANCE,
-    createdAt: Date.now(),
-    lastLoginAt: Date.now(),
+    created_at: Date.now(),
+    last_login_at: Date.now(),
+    auth_type: 'email',
   };
 
-  users.push(newUser);
-  writeUsers(users);
+  await upsertUserRecord(newUserRecord);
+
+  // Convert to User for compatibility
+  const newUser = userRecordToUser(newUserRecord);
 
   return {
     success: true,
@@ -82,29 +97,32 @@ export const registerWithMetaMask = async (walletAddress: string, signature: str
     };
   }
 
-  const users = readUsers();
-  
   // Check if user already exists
-  const existingUser = users.find(u => u.walletAddress?.toLowerCase() === walletAddress.toLowerCase());
-  if (existingUser) {
+  const existingUserRecord = await getUserByWalletAddress(walletAddress);
+  if (existingUserRecord) {
     return {
       success: false,
       message: '该钱包已注册，请直接登录',
     };
   }
 
-  // Create new user
-  const newUser: User = {
-    id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-    walletAddress: walletAddress.toLowerCase(),
-    authType: 'metamask',
+  // Create new user record
+  const newUserRecord: UserRecord = {
+    user_id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+    name: walletAddress.slice(0, 8),
+    email: undefined,
+    wallet_address: walletAddress.toLowerCase(),
+    avatar: undefined,
     balance: INITIAL_USDT_BALANCE,
-    createdAt: Date.now(),
-    lastLoginAt: Date.now(),
+    created_at: Date.now(),
+    last_login_at: Date.now(),
+    auth_type: 'metamask',
   };
 
-  users.push(newUser);
-  writeUsers(users);
+  await upsertUserRecord(newUserRecord);
+
+  // Convert to User for compatibility
+  const newUser = userRecordToUser(newUserRecord);
 
   return {
     success: true,
@@ -115,10 +133,9 @@ export const registerWithMetaMask = async (walletAddress: string, signature: str
 
 // Login with email
 export const loginWithEmail = async (email: string): Promise<AuthResult> => {
-  const users = readUsers();
-  const user = users.find(u => u.email?.toLowerCase() === email.toLowerCase());
+  const userRecord = await getUserByEmail(email);
   
-  if (!user) {
+  if (!userRecord) {
     return {
       success: false,
       message: '该邮箱未注册，请先注册',
@@ -126,8 +143,11 @@ export const loginWithEmail = async (email: string): Promise<AuthResult> => {
   }
 
   // Update last login time
-  user.lastLoginAt = Date.now();
-  writeUsers(users);
+  userRecord.last_login_at = Date.now();
+  await upsertUserRecord(userRecord);
+
+  // Convert to User for compatibility
+  const user = userRecordToUser(userRecord);
 
   return {
     success: true,
@@ -138,10 +158,9 @@ export const loginWithEmail = async (email: string): Promise<AuthResult> => {
 
 // Login with MetaMask
 export const loginWithMetaMask = async (walletAddress: string): Promise<AuthResult> => {
-  const users = readUsers();
-  const user = users.find(u => u.walletAddress?.toLowerCase() === walletAddress.toLowerCase());
+  const userRecord = await getUserByWalletAddress(walletAddress);
   
-  if (!user) {
+  if (!userRecord) {
     return {
       success: false,
       message: '该钱包未注册，请先注册',
@@ -149,8 +168,11 @@ export const loginWithMetaMask = async (walletAddress: string): Promise<AuthResu
   }
 
   // Update last login time
-  user.lastLoginAt = Date.now();
-  writeUsers(users);
+  userRecord.last_login_at = Date.now();
+  await upsertUserRecord(userRecord);
+
+  // Convert to User for compatibility
+  const user = userRecordToUser(userRecord);
 
   return {
     success: true,
@@ -160,22 +182,11 @@ export const loginWithMetaMask = async (walletAddress: string): Promise<AuthResu
 };
 
 // Get user by ID
-export const getUserById = (userId: string): User | null => {
-  const users = readUsers();
-  return users.find(u => u.id === userId) || null;
+export const getUserById = async (userId: string): Promise<User | null> => {
+  const userRecord = await getUserByIdFromDb(userId);
+  return userRecord ? userRecordToUser(userRecord) : null;
 };
 
-// Update user balance
-export const updateUserBalance = (userId: string, newBalance: number): boolean => {
-  const users = readUsers();
-  const user = users.find(u => u.id === userId);
-  
-  if (!user) {
-    return false;
-  }
-
-  user.balance = newBalance;
-  writeUsers(users);
-  return true;
-};
+// Update user balance (this is handled by database.ts updateUserBalance)
+// Keeping for compatibility but it's already in database.ts
 

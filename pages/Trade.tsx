@@ -3,20 +3,23 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { 
   ArrowLeft, Share2, Activity, Settings, ChevronDown, ChevronUp, List, 
-  ShieldAlert, User, ShieldCheck, Zap, Maximize2, Terminal, Info, Globe, Twitter, Send,
+  ShieldAlert, User as UserIcon, ShieldCheck, Zap, Maximize2, Terminal, Info, Globe, Twitter, Send,
   MousePointer2, Flame, Lock, Eye, AlertTriangle, Boxes, Copy, ExternalLink, Search,
   Star, Edit, MessageCircle, BarChart3, ThumbsUp, ChefHat, Crown, Clock, LayoutGrid, Camera
 } from 'lucide-react';
 import TradingChart from '../components/TradingChart';
+import Toast from '../components/Toast';
 import { getPairsByAddress, getMockHistoricalData, getKlineDataFromDexScreener, getKlineData } from '../services/dexScreener';
-import { TokenPair } from '../types';
+import { TokenPair, User } from '../types';
+import { executeTrade, getUserBalance, getUserTokenBalance } from '../services/tradeService';
 
 interface TradeProps {
   isLoggedIn: boolean;
   onOpenLogin: () => void;
+  currentUser?: User | null;
 }
 
-const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
+const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin, currentUser }) => {
   const { pairAddress } = useParams<{ pairAddress: string }>();
   const location = useLocation();
   const tokenFromState = (location.state as any)?.token;
@@ -34,6 +37,11 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
   const [isAuto, setIsAuto] = useState(false);
   const [chartInterval, setChartInterval] = useState<string>('1H');
   const [baseMarketCap, setBaseMarketCap] = useState<number>(214550); // Base market cap in thousands
+  const [userBalance, setUserBalance] = useState<number>(0);
+  const [isTrading, setIsTrading] = useState(false);
+  const [tokenBalance, setTokenBalance] = useState<number>(0); // User's token holding balance
+  const [toast, setToast] = useState<{ type: 'success' | 'error' | 'warning' | 'info'; message: string; details?: string } | null>(null);
+  const [orderType, setOrderType] = useState<'market' | 'limit'>('market'); // 市价 or 限价
   
   // Token info from navigation state
   const tokenName = tokenFromState?.name || pairInfo?.baseToken.name || 'BOB';
@@ -356,11 +364,131 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
     };
   }, [fetchData, chartInterval]);
 
-  const handleActionClick = () => {
-    if (!isLoggedIn) {
+  // Update user balance and token balance when currentUser or token changes
+  useEffect(() => {
+    const updateBalances = async () => {
+      if (currentUser) {
+        const balance = await getUserBalance(currentUser.id);
+        setUserBalance(balance);
+        
+        // Get token address
+        const tokenAddress = tokenFromState?.address || pairInfo?.baseToken.address || pairAddress || '';
+        if (tokenAddress) {
+          const tokenBal = await getUserTokenBalance(currentUser.id, tokenAddress);
+          setTokenBalance(tokenBal);
+        }
+      } else {
+        setUserBalance(0);
+        setTokenBalance(0);
+      }
+    };
+    updateBalances();
+  }, [currentUser, tokenFromState?.address, pairInfo?.baseToken.address, pairAddress]);
+
+  const handleActionClick = async () => {
+    if (!isLoggedIn || !currentUser) {
       onOpenLogin();
+      return;
+    }
+
+    const price = parseFloat(currentPrice) || 0.003165;
+    const tokenAddress = tokenFromState?.address || pairInfo?.baseToken.address || pairAddress || '';
+    
+    if (!tokenAddress) {
+      setToast({ type: 'error', message: '无法获取代币地址' });
+      return;
+    }
+
+    let usdAmount: number;
+    let quantity: number;
+
+    if (tradeType === 'BUY') {
+      // BUY: input is USDT amount
+      usdAmount = parseFloat(amount);
+      if (isNaN(usdAmount) || usdAmount <= 0) {
+        setToast({ type: 'error', message: '请输入有效的USDT金额' });
+        return;
+      }
+
+      // Check USDT balance
+      if (usdAmount > userBalance) {
+        setToast({ 
+          type: 'error', 
+          message: 'USDT余额不足',
+          details: `当前余额: ${userBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`
+        });
+        return;
+      }
+
+      quantity = usdAmount / price;
     } else {
-      console.log('Executing trade...');
+      // SELL: input is token quantity
+      quantity = parseFloat(amount);
+      if (isNaN(quantity) || quantity <= 0) {
+        setToast({ type: 'error', message: '请输入有效的代币数量' });
+        return;
+      }
+
+      // Check token balance
+      if (quantity > tokenBalance) {
+        setToast({ 
+          type: 'error', 
+          message: `${tokenSymbol}余额不足`,
+          details: `当前余额: ${tokenBalance.toFixed(6)} ${tokenSymbol}`
+        });
+        return;
+      }
+
+      usdAmount = quantity * price;
+    }
+
+    setIsTrading(true);
+    try {
+      const result = await executeTrade(
+        currentUser.id,
+        tradeType,
+        tokenAddress,
+        tokenSymbol,
+        tokenName,
+        tokenImage,
+        price,
+        usdAmount,
+        quantity
+      );
+
+      if (result.success) {
+        // Update user balance and token balance
+        const newBalance = await getUserBalance(currentUser.id);
+        setUserBalance(newBalance);
+        
+        const newTokenBalance = await getUserTokenBalance(currentUser.id, tokenAddress);
+        setTokenBalance(newTokenBalance);
+        
+        // Show success message
+        if (tradeType === 'BUY') {
+          setToast({ 
+            type: 'success', 
+            message: '买入成功',
+            details: `使用USDT: $${usdAmount.toFixed(2)}\n获得数量: ${quantity.toFixed(6)} ${tokenSymbol}\nGas费用: $${result.trade?.gasFee.toFixed(4) || '0.0000'}`
+          });
+        } else {
+          setToast({ 
+            type: 'success', 
+            message: '卖出成功',
+            details: `卖出数量: ${quantity.toFixed(6)} ${tokenSymbol}\n获得USDT: $${usdAmount.toFixed(2)}\nGas费用: $${result.trade?.gasFee.toFixed(4) || '0.0000'}`
+          });
+        }
+        
+        // Reset amount
+        setAmount('1');
+      } else {
+        setToast({ type: 'error', message: result.message || '交易失败' });
+      }
+    } catch (error) {
+      console.error('Trade error:', error);
+      setToast({ type: 'error', message: '交易失败，请重试' });
+    } finally {
+      setIsTrading(false);
     }
   };
 
@@ -417,7 +545,7 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
                   {/* First row: Token name and action icons */}
                   <div className="flex items-center gap-2">
                     <h1 className="font-bold text-lg text-white">
-                      {tokenName}
+                      {tokenSymbol}
                     </h1>
                     <span className="text-gray-400 text-sm">{tokenName}</span>
                     <div className="flex items-center gap-1">
@@ -431,7 +559,7 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
                         <Share2 className="w-3.5 h-3.5" />
                       </button>
                       <button className="p-1 hover:bg-white/5 rounded text-gray-400 hover:text-white transition-colors">
-                        <User className="w-3.5 h-3.5" />
+                        <UserIcon className="w-3.5 h-3.5" />
                       </button>
                       <button className="p-1 hover:bg-white/5 rounded text-gray-400 hover:text-white transition-colors">
                         <MessageCircle className="w-3.5 h-3.5" />
@@ -445,8 +573,8 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
                   <div className="flex items-center gap-2 text-[10px] text-gray-400">
                     <span>1d</span>
                     <span className="font-mono">{pairAddress ? `${pairAddress.slice(0, 4)}...${pairAddress.slice(-4)}` : '0x0a...4444'}</span>
-                    <User className="w-3 h-3 text-blue-400" />
-                    <User className="w-3 h-3 text-blue-400" />
+                    <UserIcon className="w-3 h-3 text-blue-400" />
+                    <UserIcon className="w-3 h-3 text-blue-400" />
                     <AlertTriangle className="w-3 h-3 text-yellow-400" />
                     <Send className="w-3 h-3 text-blue-400" />
                     <BarChart3 className="w-3 h-3 text-blue-400" />
@@ -661,7 +789,7 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
                        <td className="px-4 py-2.5 text-gray-400 font-bold">${formattedPrice}</td>
                        <td className="px-4 py-2.5 text-gray-300">{quantity}K</td>
                        <td className={`px-4 py-2.5 text-right font-black ${isSell ? 'text-red-500' : 'text-[#00ffa3]'}`}>${total}</td>
-                       <td className="px-4 py-2.5 text-right text-gray-500">0x{Math.random().toString(16).substring(2, 6)}...{Math.random().toString(16).substring(2, 6)} <User className="inline w-3 h-3 ml-1 opacity-0 group-hover:opacity-100" /></td>
+                       <td className="px-4 py-2.5 text-right text-gray-500">0x{Math.random().toString(16).substring(2, 6)}...{Math.random().toString(16).substring(2, 6)} <UserIcon className="inline w-3 h-3 ml-1 opacity-0 group-hover:opacity-100" /></td>
                      </tr>
                    );
                  })}
@@ -712,13 +840,19 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
 
           <div className="flex bg-[#1a1b1f] p-1 rounded-xl border border-gray-800/50">
             <button 
-              onClick={() => setTradeType('BUY')}
+              onClick={() => {
+                setTradeType('BUY');
+                setAmount('1'); // Reset amount when switching
+              }}
               className={`flex-1 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-2 ${tradeType === 'BUY' ? 'bg-[#2d2f36] text-[#00ffa3]' : 'text-gray-500 hover:text-gray-300'}`}
             >
               买入
             </button>
             <button 
-              onClick={() => setTradeType('SELL')}
+              onClick={() => {
+                setTradeType('SELL');
+                setAmount('1'); // Reset amount when switching
+              }}
               className={`flex-1 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-2 ${tradeType === 'SELL' ? 'bg-[#2d2f36] text-red-500' : 'text-gray-500 hover:text-gray-300'}`}
             >
               卖出
@@ -731,48 +865,150 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
             </button>
           </div>
 
+          {/* Order Type Selection (市价/限价) */}
+          <div className="flex items-center gap-2 mb-2">
+            <button
+              onClick={() => setOrderType('market')}
+              className={`text-[11px] font-black transition-colors ${orderType === 'market' ? 'text-white' : 'text-gray-500 hover:text-gray-300'}`}
+            >
+              市价
+            </button>
+            <button
+              onClick={() => setOrderType('limit')}
+              className={`text-[11px] font-black transition-colors flex items-center gap-1 ${orderType === 'limit' ? 'text-white' : 'text-gray-500 hover:text-gray-300'}`}
+            >
+              限价
+              <Info className="w-3 h-3" />
+            </button>
+            <div className="ml-auto text-[10px] font-black text-gray-500 uppercase">
+              {tradeType === 'BUY' 
+                ? `余额: ${userBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`
+                : `余额: ${tokenBalance.toFixed(6)} ${tokenSymbol}`
+              }
+            </div>
+          </div>
+
           <div className="flex flex-col gap-2">
             <div className="flex justify-between items-end">
               <span className="text-[10px] font-black text-gray-600 uppercase">数量</span>
-              <span className="text-[10px] font-black text-gray-500 uppercase">余额: 0 USDT</span>
             </div>
             
             <div className="relative">
               <input 
                 type="text" 
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow only numbers and decimal point
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    setAmount(value);
+                  }
+                }}
                 className="w-full bg-[#1a1b1f] border border-gray-800 rounded px-3 py-2.5 text-sm font-black font-mono focus:outline-none focus:border-gray-700 transition-all text-gray-200"
                 placeholder="0.0"
               />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-600 uppercase">USDT</div>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-600 uppercase">
+                {tradeType === 'BUY' ? 'USDT' : tokenSymbol}
+              </div>
             </div>
 
             <div className="grid grid-cols-5 gap-1">
-              {['0.01', '0.02', '0.5', '1'].map(val => (
-                <button 
-                  key={val} 
-                  onClick={() => setAmount(val)} 
-                  className="py-1.5 rounded bg-gray-800/30 border border-gray-800/50 text-[10px] font-black text-gray-500 hover:border-gray-600 hover:text-white transition-all"
-                >
-                  {val}
-                </button>
-              ))}
-              <button className="py-1.5 rounded bg-gray-800/30 border border-gray-800/50 text-gray-500 flex items-center justify-center">
-                <Settings className="w-3 h-3" />
-              </button>
+              {tradeType === 'BUY' ? (
+                // BUY: Show USDT quick amounts
+                <>
+                  {['100', '500', '1000', '10000'].map(val => (
+                    <button 
+                      key={val} 
+                      onClick={() => setAmount(val)} 
+                      className="py-1.5 rounded bg-gray-800/30 border border-gray-800/50 text-[10px] font-black text-gray-500 hover:border-gray-600 hover:text-white transition-all"
+                    >
+                      {val}
+                    </button>
+                  ))}
+                  <button 
+                    onClick={() => setAmount(userBalance.toFixed(2))}
+                    className="py-1.5 rounded bg-gray-800/30 border border-gray-800/50 text-[10px] font-black text-gray-500 hover:border-gray-600 hover:text-white transition-all"
+                  >
+                    全部
+                  </button>
+                </>
+              ) : (
+                // SELL: Show percentage buttons (10%, 25%, 50%, 100%)
+                <>
+                  {[0.1, 0.25, 0.5, 1].map(ratio => {
+                    const val = (tokenBalance * ratio).toFixed(6);
+                    return (
+                      <button 
+                        key={ratio}
+                        onClick={() => setAmount(val)} 
+                        className="py-1.5 rounded bg-gray-800/30 border border-gray-800/50 text-[10px] font-black text-gray-500 hover:border-gray-600 hover:text-white transition-all"
+                      >
+                        {ratio === 1 ? '100%' : `${(ratio * 100).toFixed(0)}%`}
+                      </button>
+                    );
+                  })}
+                  <button className="py-1.5 rounded bg-gray-800/30 border border-gray-800/50 text-gray-500 flex items-center justify-center">
+                    <Settings className="w-3 h-3" />
+                  </button>
+                </>
+              )}
             </div>
+            
+            {/* Price Conversion Display */}
+            {(() => {
+              const price = parseFloat(currentPrice) || 0.003165;
+              const inputAmount = parseFloat(amount) || 0;
+              
+              if (tradeType === 'BUY') {
+                // BUY: Show USDT to Token conversion
+                if (inputAmount > 0) {
+                  const tokenAmount = inputAmount / price;
+                  return (
+                    <div className="text-[11px] text-white font-mono mt-1">
+                      {inputAmount.toFixed(2)} USDT ≈ {tokenAmount.toFixed(4)} {tokenSymbol}
+                    </div>
+                  );
+                } else {
+                  // Default: 1 USDT ≈ X Token
+                  const tokenAmount = 1 / price;
+                  return (
+                    <div className="text-[11px] text-white font-mono mt-1">
+                      1 USDT ≈ {tokenAmount.toFixed(4)} {tokenSymbol}
+                    </div>
+                  );
+                }
+              } else {
+                // SELL: Show Token to USDT conversion
+                if (inputAmount > 0) {
+                  const usdtAmount = inputAmount * price;
+                  return (
+                    <div className="text-[11px] text-white font-mono mt-1">
+                      {inputAmount.toFixed(4)} {tokenSymbol} ≈ {usdtAmount.toFixed(2)} USDT
+                    </div>
+                  );
+                } else {
+                  // Default: 1 Token ≈ X USDT
+                  const usdtAmount = 1 * price;
+                  return (
+                    <div className="text-[11px] text-white font-mono mt-1">
+                      1 {tokenSymbol} ≈ {usdtAmount.toFixed(2)} USDT
+                    </div>
+                  );
+                }
+              }
+            })()}
           </div>
 
           <button 
             onClick={handleActionClick}
-            className={`w-full py-3.5 rounded-lg font-black text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
+            disabled={isTrading}
+            className={`w-full py-3.5 rounded-lg font-black text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${
               tradeType === 'BUY' 
               ? 'bg-[#26a69a]/70 hover:bg-[#26a69a] text-black' 
               : 'bg-[#ef5350]/70 hover:bg-[#ef5350] text-white'
             }`}
           >
-            {tradeType === 'BUY' ? '买入' : '卖出'}
+            {isTrading ? '处理中...' : (tradeType === 'BUY' ? '买入' : '卖出')}
           </button>
 
           <div className="flex items-center justify-between text-[10px] font-black text-gray-500">
@@ -998,6 +1234,16 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
            )}
         </div>
       </div>
+      
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          type={toast.type}
+          message={toast.message}
+          details={toast.details}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   );
 };

@@ -29,10 +29,53 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = (user: User) => {
-    setCurrentUser(user);
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    // Reload user from database to get latest balance
+    const usersData = localStorage.getItem('gmgn_users_data');
+    if (usersData) {
+      try {
+        const users: User[] = JSON.parse(usersData);
+        const updatedUser = users.find(u => u.id === user.id);
+        if (updatedUser) {
+          setCurrentUser(updatedUser);
+          localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedUser));
+        } else {
+          setCurrentUser(user);
+          localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+        }
+      } catch (error) {
+        setCurrentUser(user);
+        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+      }
+    } else {
+      setCurrentUser(user);
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    }
     setAuthMode(AuthMode.NONE);
   };
+
+  // Update currentUser balance periodically
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    const updateUserBalance = () => {
+      const usersData = localStorage.getItem('gmgn_users_data');
+      if (usersData) {
+        try {
+          const users: User[] = JSON.parse(usersData);
+          const updatedUser = users.find(u => u.id === currentUser.id);
+          if (updatedUser && updatedUser.balance !== currentUser.balance) {
+            setCurrentUser(updatedUser);
+            localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedUser));
+          }
+        } catch (error) {
+          console.error('Error updating user balance:', error);
+        }
+      }
+    };
+    
+    const interval = setInterval(updateUserBalance, 2000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
 
   const handleLogout = () => {
     setCurrentUser(null);
@@ -53,8 +96,8 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<Hot />} />
             <Route path="/trenches" element={<Trenches />} />
-            <Route path="/trade/:pairAddress" element={<Trade isLoggedIn={!!currentUser} onOpenLogin={() => setAuthMode(AuthMode.LOGIN)} />} />
-            <Route path="/wallet/:address" element={<Wallet />} />
+            <Route path="/trade/:pairAddress" element={<Trade isLoggedIn={!!currentUser} currentUser={currentUser} onOpenLogin={() => setAuthMode(AuthMode.LOGIN)} />} />
+            <Route path="/wallet" element={<Wallet currentUser={currentUser} />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>
