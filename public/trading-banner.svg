@@ -1,0 +1,57 @@
+<svg width="1200" height="475" viewBox="0 0 1200 475" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="1200" height="475" fill="#0a0b0d"/>
+  
+  <!-- Grid pattern -->
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1a1b1f" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="475" fill="url(#grid)" opacity="0.3"/>
+  
+  <!-- Chart lines (simplified K-line representation) -->
+  <path d="M 100 350 L 200 280 L 300 320 L 400 250 L 500 300 L 600 200 L 700 250 L 800 180 L 900 220 L 1000 150 L 1100 200" 
+        stroke="#00ffa3" stroke-width="3" fill="none" opacity="0.8"/>
+  
+  <!-- Candlesticks (simplified) -->
+  <rect x="150" y="280" width="20" height="70" fill="#00ffa3" opacity="0.6"/>
+  <rect x="250" y="320" width="20" height="40" fill="#00ffa3" opacity="0.6"/>
+  <rect x="350" y="250" width="20" height="70" fill="#00ffa3" opacity="0.6"/>
+  <rect x="450" y="300" width="20" height="50" fill="#00ffa3" opacity="0.6"/>
+  <rect x="550" y="200" width="20" height="100" fill="#00ffa3" opacity="0.6"/>
+  <rect x="650" y="250" width="20" height="50" fill="#00ffa3" opacity="0.6"/>
+  <rect x="750" y="180" width="20" height="70" fill="#00ffa3" opacity="0.6"/>
+  <rect x="850" y="220" width="20" height="40" fill="#00ffa3" opacity="0.6"/>
+  <rect x="950" y="150" width="20" height="70" fill="#00ffa3" opacity="0.6"/>
+  <rect x="1050" y="200" width="20" height="50" fill="#00ffa3" opacity="0.6"/>
+  
+  <!-- Title -->
+  <text x="600" y="100" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#ffffff" text-anchor="middle" opacity="0.9">
+    GMGN.AI Clone
+  </text>
+  <text x="600" y="140" font-family="Arial, sans-serif" font-size="24" fill="#00ffa3" text-anchor="middle" opacity="0.8">
+    单机版加密货币交易演示系统
+  </text>
+  
+  <!-- Feature icons/text -->
+  <circle cx="200" cy="400" r="25" fill="#1a1b1f" stroke="#00ffa3" stroke-width="2"/>
+  <text x="200" y="408" font-family="Arial, sans-serif" font-size="20" fill="#00ffa3" text-anchor="middle">💰</text>
+  <text x="200" y="440" font-family="Arial, sans-serif" font-size="14" fill="#9aa0aa" text-anchor="middle">实时交易</text>
+  
+  <circle cx="400" cy="400" r="25" fill="#1a1b1f" stroke="#00ffa3" stroke-width="2"/>
+  <text x="400" y="408" font-family="Arial, sans-serif" font-size="20" fill="#00ffa3" text-anchor="middle">📊</text>
+  <text x="400" y="440" font-family="Arial, sans-serif" font-size="14" fill="#9aa0aa" text-anchor="middle">K线图表</text>
+  
+  <circle cx="600" cy="400" r="25" fill="#1a1b1f" stroke="#00ffa3" stroke-width="2"/>
+  <text x="600" y="408" font-family="Arial, sans-serif" font-size="20" fill="#00ffa3" text-anchor="middle">💼</text>
+  <text x="600" y="440" font-family="Arial, sans-serif" font-size="14" fill="#9aa0aa" text-anchor="middle">资产管理</text>
+  
+  <circle cx="800" cy="400" r="25" fill="#1a1b1f" stroke="#00ffa3" stroke-width="2"/>
+  <text x="800" y="408" font-family="Arial, sans-serif" font-size="20" fill="#00ffa3" text-anchor="middle">🔒</text>
+  <text x="800" y="440" font-family="Arial, sans-serif" font-size="14" fill="#9aa0aa" text-anchor="middle">单机版</text>
+  
+  <circle cx="1000" cy="400" r="25" fill="#1a1b1f" stroke="#00ffa3" stroke-width="2"/>
+  <text x="1000" y="408" font-family="Arial, sans-serif" font-size="20" fill="#00ffa3" text-anchor="middle">⚡</text>
+  <text x="1000" y="440" font-family="Arial, sans-serif" font-size="14" fill="#9aa0aa" text-anchor="middle">快速开始</text>
+</svg>

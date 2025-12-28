@@ -263,25 +263,32 @@ const Wallet: React.FC<WalletProps> = ({ currentUser }) => {
             <div className="w-8 h-8 border-2 border-[#00ffa3] border-t-transparent rounded-full animate-spin"></div>
           </div>
         ) : activeTab === 'tokens' ? (
-          /* 持有代币表格 */
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[1200px]">
-              <thead className="bg-[#0a0b0d] sticky top-0 text-[10px] text-gray-600 font-black uppercase border-b border-gray-800/50 z-10">
-                <tr>
-                  <th className="px-4 py-3">币种/最后活跃</th>
-                  <th className="px-4 py-3">未实现利润</th>
-                  <th className="px-4 py-3">总利润</th>
-                  <th className="px-4 py-3">余额</th>
-                  <th className="px-4 py-3">持仓%</th>
-                  <th className="px-4 py-3">持仓时长</th>
-                  <th className="px-4 py-3">总买入/平均</th>
-                  <th className="px-4 py-3">总卖出/平均</th>
-                  <th className="px-4 py-3">交易数</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody className="text-[11px] font-mono divide-y divide-gray-800/30">
-                {tokens.map((token, i) => (
+          tokens.length === 0 ? (
+            /* 空状态 - 持有代币 */
+            <div className="flex flex-col items-center justify-center py-20">
+              <img src="/nodata3.svg" alt="暂无数据" className="w-20 h-20 mb-4 opacity-60" />
+              <p className="text-gray-500 text-sm">暂无数据</p>
+            </div>
+          ) : (
+            /* 持有代币表格 */
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[1200px]">
+                <thead className="bg-[#0a0b0d] sticky top-0 text-[10px] text-gray-600 font-black uppercase border-b border-gray-800/50 z-10">
+                  <tr>
+                    <th className="px-4 py-3">币种/最后活跃</th>
+                    <th className="px-4 py-3">未实现利润</th>
+                    <th className="px-4 py-3">总利润</th>
+                    <th className="px-4 py-3">余额</th>
+                    <th className="px-4 py-3">持仓%</th>
+                    <th className="px-4 py-3">持仓时长</th>
+                    <th className="px-4 py-3">总买入/平均</th>
+                    <th className="px-4 py-3">总卖出/平均</th>
+                    <th className="px-4 py-3">交易数</th>
+                    <th className="px-4 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody className="text-[11px] font-mono divide-y divide-gray-800/30">
+                  {tokens.map((token, i) => (
                   <tr key={i} className="hover:bg-white/[0.03] group border-b border-white/[0.02]">
                     <td className="px-4 py-3">
                       <Link to={`/trade/${token.address}`} className="flex items-center gap-3">
@@ -346,29 +353,37 @@ const Wallet: React.FC<WalletProps> = ({ currentUser }) => {
                       </button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
         ) : (
-          /* 活动表格 */
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[1000px]">
-              <thead className="bg-[#0a0b0d] sticky top-0 text-[10px] text-gray-600 font-black uppercase border-b border-gray-800/50 z-10">
-                <tr>
-                  <th className="px-4 py-3">类型</th>
-                  <th className="px-4 py-3">币种</th>
-                  <th className="px-4 py-3">市值</th>
-                  <th className="px-4 py-3">数量</th>
-                  <th className="px-4 py-3">总额 USD</th>
-                  <th className="px-4 py-3">利润</th>
-                  <th className="px-4 py-3">时长</th>
-                  <th className="px-4 py-3">Gas费用</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody className="text-[11px] font-mono divide-y divide-gray-800/30">
-                {activities.map((activity) => (
+          activities.length === 0 ? (
+            /* 空状态 - 活动 */
+            <div className="flex flex-col items-center justify-center py-20">
+              <img src="/nodata3.svg" alt="暂无数据" className="w-20 h-20 mb-4 opacity-60" />
+              <p className="text-gray-500 text-sm">暂无数据</p>
+            </div>
+          ) : (
+            /* 活动表格 */
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[1000px]">
+                <thead className="bg-[#0a0b0d] sticky top-0 text-[10px] text-gray-600 font-black uppercase border-b border-gray-800/50 z-10">
+                  <tr>
+                    <th className="px-4 py-3">类型</th>
+                    <th className="px-4 py-3">币种</th>
+                    <th className="px-4 py-3">市值</th>
+                    <th className="px-4 py-3">数量</th>
+                    <th className="px-4 py-3">总额 USD</th>
+                    <th className="px-4 py-3">利润</th>
+                    <th className="px-4 py-3">时长</th>
+                    <th className="px-4 py-3">Gas费用</th>
+                    <th className="px-4 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody className="text-[11px] font-mono divide-y divide-gray-800/30">
+                  {activities.map((activity) => (
                   <tr key={activity.id} className="hover:bg-white/[0.03] group border-b border-white/[0.02]">
                     <td className="px-4 py-3">
                       <div className={`flex items-center gap-1.5 font-black ${activity.type === 'BUY' ? 'text-[#00ffa3]' : 'text-red-500'}`}>
@@ -422,10 +437,11 @@ const Wallet: React.FC<WalletProps> = ({ currentUser }) => {
                       </button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
         )}
       </div>
     </div>

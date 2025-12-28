@@ -1,5 +1,5 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+<img width="1200" height="475" alt="GMGN.AI Clone Trading System" src="https://raw.githubusercontent.com/HebrewMan/Gegn-demo/main/public/banner.jpeg" />
 </div>
 
 # GMGN.AI Clone - 单机版交易演示系统
@@ -33,6 +33,26 @@
    
    打开浏览器访问 `http://localhost:5173`（或终端显示的地址）
 
+## ⚙️ 功能说明
+
+### 可用功能
+
+#### 注册功能
+- **邮箱注册**：输入邮箱地址（会进行格式验证）
+- **MetaMask 钱包注册**：连接 MetaMask 钱包并签名验证
+- ⭐ **推荐使用 MetaMask 钱包注册**，体验更流畅
+
+#### 导航栏功能
+- **热门**：✅ 可用 - 查看热门代币列表，点击进入交易页面
+- **资产**：✅ 可用 - 查看个人资产和交易记录
+- **战壕**：❌ 仅显示 - 功能开发中
+- **跟单**：❌ 仅显示 - 功能开发中
+- **监控**：❌ 仅显示 - 功能开发中
+- **追踪**：❌ 仅显示 - 功能开发中
+- **奖励**：❌ 仅显示 - 功能开发中
+
+> 💡 **注意**：Navbar 中只有"热门"和"资产"两个功能可用，其他选项仅用于界面展示。
+
 ## 📋 使用流程
 
 ### 1. 注册账户
@@ -41,7 +61,7 @@
 - 选择"注册"标签
 - 可以使用以下两种方式注册：
   - **邮箱注册**：输入邮箱地址（会进行格式验证）
-  - **MetaMask 注册**：连接 MetaMask 钱包并签名验证
+  - **MetaMask 注册**：连接 MetaMask 钱包并签名验证（⭐ 推荐）
 
 > 💡 **新用户福利**：每个新注册的用户会自动获得 **1000 USDT** 的初始余额
 
