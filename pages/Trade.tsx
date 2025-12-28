@@ -33,6 +33,7 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isAuto, setIsAuto] = useState(false);
   const [chartInterval, setChartInterval] = useState<string>('1H');
+  const [baseMarketCap, setBaseMarketCap] = useState<number>(214550); // Base market cap in thousands
   
   // Token info from navigation state
   const tokenName = tokenFromState?.name || pairInfo?.baseToken.name || 'BOB';
@@ -40,6 +41,12 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
   // Use currentPrice from K-line data, fallback to initial price
   const tokenPrice = currentPrice ? `$${currentPrice}` : (tokenFromState?.price || pairInfo?.priceUsd || '$0.003165');
   const tokenImage = tokenFromState?.image || `https://avatar.vercel.sh/${tokenSymbol}.png?size=40`;
+  
+  // Calculate market cap based on current price
+  // Market cap = price * total supply (assuming 1B supply)
+  const currentPriceNum = parseFloat(currentPrice) || 0.003165;
+  const totalSupply = 1000000000; // 1B
+  const calculatedMarketCap = currentPriceNum * totalSupply / 1000; // Convert to thousands
   
   // Initialize currentPrice from tokenFromState or pairInfo
   useEffect(() => {
@@ -90,10 +97,12 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
       if (tokenFromState?.symbol) {
         try {
           // Try to get K-line data from Binance using symbol (format: SYMBOLUSDT)
-          // Map interval to Binance format: 1s -> 1s, 30s -> 30s, 1m -> 1m, 1H -> 1h, 4H -> 4h, 1D -> 1d
+          // Map interval to Binance format
+          // Note: Binance API supports: 1s, 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 3d, 1w, 1M
+          // 30s is not supported, so we map it to 1m
           const intervalMap: Record<string, string> = {
             '1s': '1s',
-            '30s': '30s',
+            '30s': '1m', // Binance doesn't support 30s, use 1m instead
             '1m': '1m',
             '1H': '1h',
             '4H': '4h',
@@ -105,7 +114,12 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
           if (klineData && klineData.length > 0) {
             setChartData(klineData);
             // Update current price from the last K-line data point
-            const lastPrice = klineData[klineData.length - 1]?.close || basePrice;
+            let lastPrice = klineData[klineData.length - 1]?.close || basePrice;
+            
+            // Add small random variation (±1%) to make price more dynamic
+            const variation = (Math.random() - 0.5) * 0.02; // ±1% variation
+            lastPrice = lastPrice * (1 + variation);
+            
             setCurrentPrice(lastPrice.toFixed(7));
             // Calculate price changes from K-line data
             if (klineData.length >= 1) {
@@ -137,7 +151,12 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
         if (klineData && klineData.length > 0) {
           setChartData(klineData);
           // Update current price from the last K-line data point
-          const lastPrice = klineData[klineData.length - 1]?.close || basePrice;
+          let lastPrice = klineData[klineData.length - 1]?.close || basePrice;
+          
+          // Add small random variation (±1%) to make price more dynamic
+          const variation = (Math.random() - 0.5) * 0.02; // ±1% variation
+          lastPrice = lastPrice * (1 + variation);
+          
           setCurrentPrice(lastPrice.toFixed(7));
           // Calculate price changes from K-line data
           if (klineData.length >= 1) {
@@ -161,7 +180,12 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
           const mockData = getMockHistoricalData(250, basePrice);
           setChartData(mockData);
           // Update current price from the last mock data point
-          const lastPrice = mockData[mockData.length - 1]?.close || basePrice;
+          let lastPrice = mockData[mockData.length - 1]?.close || basePrice;
+          
+          // Add small random variation (±1%) to make price more dynamic
+          const variation = (Math.random() - 0.5) * 0.02; // ±1% variation
+          lastPrice = lastPrice * (1 + variation);
+          
           setCurrentPrice(lastPrice.toFixed(7));
           // Calculate price changes from mock data
           if (mockData.length >= 1) {
@@ -185,9 +209,14 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
         // Use mock data with correct base price
         const mockData = getMockHistoricalData(250, basePrice);
         setChartData(mockData);
-        // Update current price from the last mock data point
-        const lastPrice = mockData[mockData.length - 1]?.close || basePrice;
-        setCurrentPrice(lastPrice.toFixed(7));
+          // Update current price from the last mock data point
+          let lastPrice = mockData[mockData.length - 1]?.close || basePrice;
+          
+          // Add small random variation (±1%) to make price more dynamic
+          const variation = (Math.random() - 0.5) * 0.02; // ±1% variation
+          lastPrice = lastPrice * (1 + variation);
+          
+          setCurrentPrice(lastPrice.toFixed(7));
         // Calculate 24h price change from mock data
         if (mockData.length >= 24) {
           const price24hAgo = mockData[mockData.length - 24]?.close || lastPrice;
@@ -199,9 +228,12 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
       // Try to get K-line data as fallback
       try {
         if (tokenFromState?.symbol) {
+          // Map interval to Binance format
+          // Note: Binance API supports: 1s, 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 8h, 12h, 1d, 3d, 1w, 1M
+          // 30s is not supported, so we map it to 1m
           const intervalMap: Record<string, string> = {
             '1s': '1s',
-            '30s': '30s',
+            '30s': '1m', // Binance doesn't support 30s, use 1m instead
             '1m': '1m',
             '1H': '1h',
             '4H': '4h',
@@ -213,7 +245,12 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
           if (klineData && klineData.length > 0) {
             setChartData(klineData);
             // Update current price from the last K-line data point
-            const lastPrice = klineData[klineData.length - 1]?.close || basePrice;
+            let lastPrice = klineData[klineData.length - 1]?.close || basePrice;
+            
+            // Add small random variation (±1%) to make price more dynamic
+            const variation = (Math.random() - 0.5) * 0.02; // ±1% variation
+            lastPrice = lastPrice * (1 + variation);
+            
             setCurrentPrice(lastPrice.toFixed(7));
             // Calculate 24h price change from K-line data
             if (klineData.length >= 24) {
@@ -228,7 +265,12 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
         if (klineData && klineData.length > 0) {
           setChartData(klineData);
           // Update current price from the last K-line data point
-          const lastPrice = klineData[klineData.length - 1]?.close || basePrice;
+          let lastPrice = klineData[klineData.length - 1]?.close || basePrice;
+          
+          // Add small random variation (±1%) to make price more dynamic
+          const variation = (Math.random() - 0.5) * 0.02; // ±1% variation
+          lastPrice = lastPrice * (1 + variation);
+          
           setCurrentPrice(lastPrice.toFixed(7));
           // Calculate price changes from K-line data
           if (klineData.length >= 1) {
@@ -251,7 +293,12 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
           const mockData = getMockHistoricalData(250, basePrice);
           setChartData(mockData);
           // Update current price from the last mock data point
-          const lastPrice = mockData[mockData.length - 1]?.close || basePrice;
+          let lastPrice = mockData[mockData.length - 1]?.close || basePrice;
+          
+          // Add small random variation (±1%) to make price more dynamic
+          const variation = (Math.random() - 0.5) * 0.02; // ±1% variation
+          lastPrice = lastPrice * (1 + variation);
+          
           setCurrentPrice(lastPrice.toFixed(7));
           // Calculate price changes from mock data
           if (mockData.length >= 1) {
@@ -274,9 +321,14 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
       } catch (e2) {
         const mockData = getMockHistoricalData(250, basePrice);
         setChartData(mockData);
-        // Update current price from the last mock data point
-        const lastPrice = mockData[mockData.length - 1]?.close || basePrice;
-        setCurrentPrice(lastPrice.toFixed(7));
+          // Update current price from the last mock data point
+          let lastPrice = mockData[mockData.length - 1]?.close || basePrice;
+          
+          // Add small random variation (±1%) to make price more dynamic
+          const variation = (Math.random() - 0.5) * 0.02; // ±1% variation
+          lastPrice = lastPrice * (1 + variation);
+          
+          setCurrentPrice(lastPrice.toFixed(7));
         // Calculate 24h price change from mock data
         if (mockData.length >= 24) {
           const price24hAgo = mockData[mockData.length - 24]?.close || lastPrice;
@@ -407,9 +459,9 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
                   </div>
                 </div>
 
-                {/* Market cap - independent element */}
+                {/* Market cap - independent element, calculated from current price */}
                 <div className="text-2xl font-bold text-white flex-shrink-0">
-                  ${pairInfo?.marketCap ? (pairInfo.marketCap >= 1000000 ? `${(pairInfo.marketCap / 1000000).toFixed(2)}M` : `${(pairInfo.marketCap / 1000).toFixed(1)}K`) : '214.55K'}
+                  ${calculatedMarketCap >= 1000 ? `${(calculatedMarketCap / 1000).toFixed(2)}M` : `${calculatedMarketCap.toFixed(1)}K`}
                 </div>
 
                 {/* Metrics table - four columns */}
@@ -449,7 +501,7 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
         </div>
 
         {/* Chart Toolbar */}
-        <div className="h-10 px-4 border-b border-gray-800 flex items-center justify-between bg-[#0a0b0d] flex-shrink-0">
+        <div className="h-10 px-4 flex items-center justify-between bg-[#0a0b0d] flex-shrink-0">
           {/* Left: Time Interval Selector */}
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1">

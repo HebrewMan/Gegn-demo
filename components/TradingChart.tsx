@@ -1,7 +1,6 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { createChart, ColorType, CrosshairMode, CandlestickSeries, HistogramSeries, LineStyle, LineType } from 'lightweight-charts';
-import { ZoomIn, ZoomOut } from 'lucide-react';
 
 type TimeInterval = '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1D' | '1W';
 
@@ -78,7 +77,6 @@ const TradingChart: React.FC<TradingChartProps> = ({ data, symbol, interval = '1
   const chartRef = useRef<any>(null);
   const seriesRef = useRef<any>(null);
   const highPriceLineRef = useRef<any>(null);
-  const [zoomLevel, setZoomLevel] = useState(1);
   
   // Calculate historical high price
   const historicalHigh = data && data.length > 0 
@@ -143,7 +141,7 @@ const TradingChart: React.FC<TradingChartProps> = ({ data, symbol, interval = '1
         rightPriceScale: {
           borderColor: '#1e222d',
           scaleMargins: {
-            top: 0.05, // Reduced from 0.1 to show more price ticks
+            top: 0.15, // Increased top margin to leave space above historical high line
             bottom: 0.05, // Reduced from 0.1 to show more price ticks
           },
           entireTextOnly: false,
@@ -201,10 +199,10 @@ const TradingChart: React.FC<TradingChartProps> = ({ data, symbol, interval = '1
         },
       });
 
-      // Add historical high price line
+      // Add historical high price line (red dashed line)
       const highPriceLine = candlestickSeries.createPriceLine({
         price: historicalHigh,
-        color: '#71717a',
+        color: '#ef5350', // Red color to match screenshot
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
         axisLabelVisible: true,
@@ -311,32 +309,17 @@ const TradingChart: React.FC<TradingChartProps> = ({ data, symbol, interval = '1
       }
     }
   }, [data, historicalHigh]);
-  
-  // Handle zoom functions
-  const handleZoomIn = () => {
-    if (chartRef.current) {
-      chartRef.current.timeScale().scrollToPosition(-5, false);
-      setZoomLevel(prev => Math.min(prev + 0.1, 2));
-    }
-  };
-  
-  const handleZoomOut = () => {
-    if (chartRef.current) {
-      chartRef.current.timeScale().scrollToPosition(-5, false);
-      setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
-    }
-  };
 
   return (
     <div className="w-full h-full relative overflow-hidden bg-[#0a0b0d]">
       <div ref={chartContainerRef} className="w-full h-full" />
       
-      {/* Chart Overlay Info - Left aligned */}
+      {/* Chart Overlay Info - Left aligned, positioned right below toolbar (toolbar is h-10 = 40px) */}
       {data && data.length > 0 && (
-        <div className="absolute top-3 left-4 z-10 flex flex-col gap-1 pointer-events-none select-none">
+        <div className="absolute top-0 left-4 z-10 flex flex-col gap-1 pointer-events-none select-none">
           <div className="flex items-center gap-2">
             <span className="text-[#00ffa3] font-black text-[11px] uppercase tracking-wider">{symbol} · {interval.toUpperCase()} · GMGN</span>
-            <div className="flex gap-2 text-[10px] font-mono text-gray-500">
+            <div className="flex gap-2 text-[13px] font-mono text-gray-500">
               <span>开 <span className="text-gray-300">{formatPrice(data[data.length-1]?.open || 0)}</span></span>
               <span>高 <span className="text-[#26a69a]">{formatPrice(data[data.length-1]?.high || 0)}</span></span>
               <span>低 <span className="text-[#ef5350]">{formatPrice(data[data.length-1]?.low || 0)}</span></span>
@@ -351,24 +334,6 @@ const TradingChart: React.FC<TradingChartProps> = ({ data, symbol, interval = '1
           </div>
         </div>
       )}
-
-      {/* Zoom Controls */}
-      <div className="absolute top-3 right-4 z-20 flex items-center gap-1">
-        <button
-          onClick={handleZoomIn}
-          className="p-1.5 bg-[#1a1b1f] border border-gray-800 rounded text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
-          title="放大"
-        >
-          <ZoomIn className="w-3.5 h-3.5" />
-        </button>
-        <button
-          onClick={handleZoomOut}
-          className="p-1.5 bg-[#1a1b1f] border border-gray-800 rounded text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
-          title="缩小"
-        >
-          <ZoomOut className="w-3.5 h-3.5" />
-        </button>
-      </div>
 
       {/* Watermark - GMGN.AI */}
       <div className="absolute inset-0 flex items-center justify-center opacity-[0.02] pointer-events-none select-none z-0">
