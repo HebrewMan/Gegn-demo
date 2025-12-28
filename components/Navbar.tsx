@@ -2,17 +2,21 @@
 import React, { useState } from 'react';
 import { Search, Star, Trophy, Smartphone, ChevronDown, Settings, Bell } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { User } from '../types';
+import UserMenu from './UserMenu';
 
 interface NavbarProps {
   isLoggedIn: boolean;
+  currentUser?: User | null;
   onOpenAuth: (mode: any) => void;
   onLogout: () => void;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, onOpenAuth, onLogout }) => {
+const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, currentUser, onOpenAuth, onLogout }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   const navItems = [
     { label: '战壕', path: '/trenches' },
@@ -100,9 +104,20 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, onOpenAuth, onLogout }) => 
           <Settings className="w-4 h-4 text-gray-500 hover:text-white cursor-pointer" />
           
           {isLoggedIn ? (
-            <button onClick={onLogout} className="w-8 h-8 rounded-full border border-gray-700 bg-gray-800 flex items-center justify-center overflow-hidden">
-               <img src="https://picsum.photos/32/32?random=auth" alt="" />
-            </button>
+            <div className="flex items-center gap-2">
+              <div className="text-[11px] text-gray-400">
+                {currentUser?.email || (currentUser?.walletAddress ? `${currentUser.walletAddress.slice(0, 6)}...${currentUser.walletAddress.slice(-4)}` : '')}
+              </div>
+              <div className="text-[10px] text-[#00ffa3] font-bold">
+                {currentUser?.balance.toFixed(2)} BNB
+              </div>
+              <button 
+                onClick={() => setShowUserMenu(true)} 
+                className="w-8 h-8 rounded-full border border-gray-700 bg-gray-800 flex items-center justify-center overflow-hidden hover:border-[#00ffa3] transition-colors cursor-pointer"
+              >
+                <img src="https://picsum.photos/32/32?random=auth" alt="" />
+              </button>
+            </div>
           ) : (
             <>
               <button onClick={() => onOpenAuth('REGISTER')} className="text-[12px] font-bold text-gray-400 hover:text-white px-2">注册</button>
@@ -111,6 +126,15 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, onOpenAuth, onLogout }) => 
           )}
         </div>
       </div>
+
+      {/* User Menu Modal */}
+      {showUserMenu && currentUser && (
+        <UserMenu
+          user={currentUser}
+          onClose={() => setShowUserMenu(false)}
+          onLogout={onLogout}
+        />
+      )}
     </nav>
   );
 };

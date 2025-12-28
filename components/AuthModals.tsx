@@ -1,18 +1,92 @@
-
 import React, { useState } from 'react';
-import { X, Send, Mail, Ghost, Wallet } from 'lucide-react';
-import { AuthMode } from '../types';
+import { X, Send, Mail, Ghost, Wallet, Loader2 } from 'lucide-react';
+import { AuthMode, User } from '../types';
+import { registerWithEmail, registerWithMetaMask, loginWithEmail, loginWithMetaMask } from '../services/userService';
+import { connectMetaMask, signMessage, getSignMessage, isMetaMaskInstalled } from '../services/metamaskService';
 
 interface AuthModalsProps {
   mode: AuthMode;
   onClose: () => void;
   onSwitch: (mode: AuthMode) => void;
-  onLogin: () => void;
+  onLogin: (user: User) => void;
 }
 
 const AuthModals: React.FC<AuthModalsProps> = ({ mode, onClose, onSwitch, onLogin }) => {
   const [email, setEmail] = useState('');
-  
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [metamaskLoading, setMetamaskLoading] = useState(false);
+
+  const handleEmailAuth = async () => {
+    setError('');
+    setLoading(true);
+
+    try {
+      if (mode === AuthMode.REGISTER) {
+        const result = await registerWithEmail(email);
+        if (result.success && result.user) {
+          onLogin(result.user);
+        } else {
+          setError(result.message || '注册失败');
+        }
+      } else {
+        const result = await loginWithEmail(email);
+        if (result.success && result.user) {
+          onLogin(result.user);
+        } else {
+          setError(result.message || '登录失败');
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || '操作失败，请重试');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMetaMaskAuth = async () => {
+    setError('');
+    setMetamaskLoading(true);
+
+    try {
+      if (!isMetaMaskInstalled()) {
+        setError('请先安装 MetaMask 钱包');
+        setMetamaskLoading(false);
+        return;
+      }
+
+      // Connect to MetaMask
+      const walletAddress = await connectMetaMask();
+      
+      // Generate message for signing
+      const timestamp = Date.now();
+      const message = getSignMessage(walletAddress, timestamp);
+      
+      // Request signature
+      const signature = await signMessage(walletAddress, message);
+
+      if (mode === AuthMode.REGISTER) {
+        const result = await registerWithMetaMask(walletAddress, signature);
+        if (result.success && result.user) {
+          onLogin(result.user);
+        } else {
+          setError(result.message || '注册失败');
+        }
+      } else {
+        const result = await loginWithMetaMask(walletAddress);
+        if (result.success && result.user) {
+          onLogin(result.user);
+        } else {
+          setError(result.message || '登录失败');
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || '操作失败，请重试');
+    } finally {
+      setMetamaskLoading(false);
+    }
+  };
+
   if (mode === AuthMode.NONE) return null;
 
   return (
@@ -35,6 +109,12 @@ const AuthModals: React.FC<AuthModalsProps> = ({ mode, onClose, onSwitch, onLogi
             )}
           </p>
 
+          {error && (
+            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-400">
+              {error}
+            </div>
+          )}
+
           <div className="space-y-4">
             <div>
               <label className="block text-xs text-gray-500 mb-1 uppercase">邮箱</label>
@@ -42,8 +122,17 @@ const AuthModals: React.FC<AuthModalsProps> = ({ mode, onClose, onSwitch, onLogi
                 type="email"
                 placeholder="输入邮箱"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setError('');
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !loading) {
+                    handleEmailAuth();
+                  }
+                }}
                 className="w-full bg-[#0a0b0d] border border-gray-800 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[#00ffa3] transition-colors"
+                disabled={loading}
               />
             </div>
 
@@ -62,10 +151,18 @@ const AuthModals: React.FC<AuthModalsProps> = ({ mode, onClose, onSwitch, onLogi
             )}
 
             <button 
-              onClick={onLogin}
-              className="w-full bg-[#00ffa3] text-black font-bold py-3 rounded-lg hover:bg-[#00e692] transition-colors mt-4 shadow-lg shadow-[#00ffa3]/10"
+              onClick={handleEmailAuth}
+              disabled={loading || !email.trim()}
+              className="w-full bg-[#00ffa3] text-black font-bold py-3 rounded-lg hover:bg-[#00e692] transition-colors mt-4 shadow-lg shadow-[#00ffa3]/10 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {mode === AuthMode.LOGIN ? '登录' : '注册'}
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {mode === AuthMode.LOGIN ? '登录中...' : '注册中...'}
+                </>
+              ) : (
+                mode === AuthMode.LOGIN ? '登录' : '注册'
+              )}
             </button>
           </div>
 
@@ -81,9 +178,22 @@ const AuthModals: React.FC<AuthModalsProps> = ({ mode, onClose, onSwitch, onLogi
           </div>
 
           <div className="grid grid-cols-3 gap-4">
-            <SocialButton icon={<Send className="w-5 h-5 text-blue-400" />} label="Telegram" />
-            <SocialButton icon={<Ghost className="w-5 h-5 text-purple-400" />} label="Phantom" />
-            <SocialButton icon={<Wallet className="w-5 h-5 text-orange-400" />} label="MetaMask" />
+            <SocialButton 
+              icon={<Send className="w-5 h-5 text-blue-400" />} 
+              label="Telegram" 
+              onClick={() => setError('Telegram 登录功能暂未开放')}
+            />
+            <SocialButton 
+              icon={<Ghost className="w-5 h-5 text-purple-400" />} 
+              label="Phantom" 
+              onClick={() => setError('Phantom 登录功能暂未开放')}
+            />
+            <SocialButton 
+              icon={<Wallet className="w-5 h-5 text-orange-400" />} 
+              label="MetaMask" 
+              onClick={handleMetaMaskAuth}
+              loading={metamaskLoading}
+            />
           </div>
 
           <div className="mt-8 flex justify-center gap-4 text-[10px] text-gray-500">
@@ -109,10 +219,19 @@ const AuthModals: React.FC<AuthModalsProps> = ({ mode, onClose, onSwitch, onLogi
   );
 };
 
-const SocialButton: React.FC<{ icon: React.ReactNode; label: string }> = ({ icon, label }) => (
-  <button className="flex flex-col items-center gap-2 hover:opacity-80 transition-opacity">
+const SocialButton: React.FC<{ 
+  icon: React.ReactNode; 
+  label: string; 
+  onClick?: () => void;
+  loading?: boolean;
+}> = ({ icon, label, onClick, loading }) => (
+  <button 
+    onClick={onClick}
+    disabled={loading}
+    className="flex flex-col items-center gap-2 hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+  >
     <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center">
-      {icon}
+      {loading ? <Loader2 className="w-5 h-5 text-orange-400 animate-spin" /> : icon}
     </div>
     <span className="text-[10px] text-gray-400">{label}</span>
   </button>

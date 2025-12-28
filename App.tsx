@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import AuthModals from './components/AuthModals';
@@ -7,26 +7,43 @@ import Hot from './pages/Hot';
 import Trade from './pages/Trade';
 import Trenches from './pages/Trenches';
 import Wallet from './pages/Wallet';
-import { AuthMode } from './types';
+import { AuthMode, User } from './types';
+
+const CURRENT_USER_KEY = 'gmgn_current_user';
 
 const App: React.FC = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authMode, setAuthMode] = useState<AuthMode>(AuthMode.NONE);
 
-  const handleLogin = () => {
-    setIsLoggedIn(true);
+  // Load user from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedUser = localStorage.getItem(CURRENT_USER_KEY);
+      if (savedUser) {
+        setCurrentUser(JSON.parse(savedUser));
+      }
+    } catch (error) {
+      console.error('Error loading user:', error);
+    }
+  }, []);
+
+  const handleLogin = (user: User) => {
+    setCurrentUser(user);
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
     setAuthMode(AuthMode.NONE);
   };
 
   const handleLogout = () => {
-    setIsLoggedIn(false);
+    setCurrentUser(null);
+    localStorage.removeItem(CURRENT_USER_KEY);
   };
 
   return (
     <Router>
       <div className="min-h-screen flex flex-col bg-[#0a0b0d] text-white selection:bg-[#00ffa3]/30">
         <Navbar 
-          isLoggedIn={isLoggedIn} 
+          isLoggedIn={!!currentUser} 
+          currentUser={currentUser}
           onOpenAuth={setAuthMode} 
           onLogout={handleLogout} 
         />
@@ -35,7 +52,7 @@ const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<Hot />} />
             <Route path="/trenches" element={<Trenches />} />
-            <Route path="/trade/:pairAddress" element={<Trade isLoggedIn={isLoggedIn} onOpenLogin={() => setAuthMode(AuthMode.LOGIN)} />} />
+            <Route path="/trade/:pairAddress" element={<Trade isLoggedIn={!!currentUser} onOpenLogin={() => setAuthMode(AuthMode.LOGIN)} />} />
             <Route path="/wallet/:address" element={<Wallet />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>

@@ -96,3 +96,19 @@ export interface WalletActivity {
   gasFee: number;
   timestamp: number;
 }
+
+export interface User {
+  id: string;
+  email?: string;
+  walletAddress?: string;
+  authType: 'email' | 'metamask';
+  balance: number; // BNB balance
+  createdAt: number;
+  lastLoginAt: number;
+}
+
+export interface AuthResult {
+  success: boolean;
+  message?: string;
+  user?: User;
+}
