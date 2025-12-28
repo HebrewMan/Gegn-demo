@@ -59,10 +59,10 @@ const UserMenu: React.FC<UserMenuProps> = ({ user, onClose, onLogout }) => {
         <div className="p-6">
           {/* Header: BNB Balance */}
           <div className="mb-6">
-            <div className="text-sm text-gray-400 mb-2">BNB总余额</div>
+            <div className="text-sm text-gray-400 mb-2">USDT总余额</div>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
-                <span className="text-yellow-500 font-bold text-lg">B</span>
+              <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                <span className="text-green-500 font-bold text-lg">U</span>
               </div>
               <div>
                 <div className="text-xl font-bold text-white">

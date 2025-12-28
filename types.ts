@@ -102,7 +102,7 @@ export interface User {
   email?: string;
   walletAddress?: string;
   authType: 'email' | 'metamask';
-  balance: number; // BNB balance
+  balance: number; // USDT balance
   createdAt: number;
   lastLoginAt: number;
 }

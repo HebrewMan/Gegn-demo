@@ -129,11 +129,22 @@ const TradingChart: React.FC<TradingChartProps> = ({ data, symbol }) => {
         priceScaleId: 'right',
       });
 
-      // Add volume histogram series
+      // Set localization to format prices with 7 decimal places and volume with 2 decimal places
+      chart.applyOptions({
+        localization: {
+          priceFormatter: (price: number) => {
+            return formatPrice(price);
+          },
+        },
+      });
+
+      // Add volume histogram series with 2 decimal places
       const volumeSeries = chart.addSeries(HistogramSeries, {
         color: '#26a69a33',
         priceFormat: {
           type: 'volume',
+          precision: 2,
+          minMove: 0.01,
         },
         priceScaleId: 'volume',
       });
@@ -144,6 +155,20 @@ const TradingChart: React.FC<TradingChartProps> = ({ data, symbol }) => {
           top: 0.8,
           bottom: 0,
         },
+      });
+      
+      // Set price formatter to show 7 decimal places for prices
+      chart.applyOptions({
+        localization: {
+          priceFormatter: (price: number) => {
+            return formatPrice(price);
+          },
+        },
+      });
+      
+      // Set volume formatter on the volume price scale
+      chart.priceScale('volume').applyOptions({
+        // Volume formatting is handled by the series priceFormat precision: 2
       });
 
       chartRef.current = chart;

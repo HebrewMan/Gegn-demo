@@ -8,20 +8,32 @@ const Hot: React.FC = () => {
   const [hotTokens, setHotTokens] = useState<HotToken[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchHotTokens = async () => {
-      setIsLoading(true);
-      try {
-        const tokens = await getTrendingTokens(20);
-        setHotTokens(tokens);
-      } catch (error) {
-        console.error('Error fetching hot tokens:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchHotTokens();
+  // Fetch hot tokens function
+  const fetchHotTokens = React.useCallback(async () => {
+    try {
+      const tokens = await getTrendingTokens(20);
+      setHotTokens(tokens);
+    } catch (error) {
+      console.error('Error fetching hot tokens:', error);
+    }
   }, []);
+
+  // Initial data fetch
+  useEffect(() => {
+    setIsLoading(true);
+    fetchHotTokens().finally(() => setIsLoading(false));
+  }, [fetchHotTokens]);
+
+  // Polling: Update data every 2 seconds
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchHotTokens();
+    }, 2000); // 2 seconds
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [fetchHotTokens]);
   return (
     <div className="flex-1 overflow-auto bg-[#0a0b0d] flex flex-col">
       {/* Search Overlay for Hot page logic (mimicking UI) */}
@@ -156,7 +168,7 @@ const Hot: React.FC = () => {
                      </div>
                   </td>
                   <td className="px-4 py-4 font-mono text-gray-300">{token.holders || '0'}</td>
-                  <td className="px-4 py-4 font-mono text-red-400/80">{token.totalFee || '0 BNB'}</td>
+                  <td className="px-4 py-4 font-mono text-red-400/80">{token.totalFee || '0 USDT'}</td>
                   <td className="px-4 py-4">
                     <div className="flex flex-wrap gap-1 items-center">
                       <Tag text="3%" color="green" />

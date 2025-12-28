@@ -4,6 +4,7 @@ import { Search, Star, Trophy, Smartphone, ChevronDown, Settings, Bell } from 'l
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { User } from '../types';
 import UserMenu from './UserMenu';
+import Logo from './Logo';
 
 interface NavbarProps {
   isLoggedIn: boolean;
@@ -32,10 +33,7 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, currentUser, onOpenAuth, on
     <nav className="h-12 border-b border-gray-800 bg-[#0a0b0d] flex items-center px-4 sticky top-0 z-[60]">
       <div className="flex items-center gap-6 flex-1">
         <Link to="/" className="flex items-center gap-1.5">
-          <div className="w-7 h-7 bg-[#00ffa3] rounded flex items-center justify-center">
-            <img src="https://gmgn.ai/favicon.ico" alt="GMGN" className="w-5 h-5 invert" />
-          </div>
-          <span className="font-bold text-lg tracking-tight uppercase">GMGN</span>
+          <Logo className="h-7" showText={true} />
         </Link>
 
         <div className="hidden lg:flex items-center gap-5">
@@ -109,7 +107,7 @@ const Navbar: React.FC<NavbarProps> = ({ isLoggedIn, currentUser, onOpenAuth, on
                 {currentUser?.email || (currentUser?.walletAddress ? `${currentUser.walletAddress.slice(0, 6)}...${currentUser.walletAddress.slice(-4)}` : '')}
               </div>
               <div className="text-[10px] text-[#00ffa3] font-bold">
-                {currentUser?.balance.toFixed(2)} BNB
+                {currentUser?.balance.toFixed(2)} USDT
               </div>
               <button 
                 onClick={() => setShowUserMenu(true)} 

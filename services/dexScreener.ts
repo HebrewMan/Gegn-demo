@@ -110,7 +110,7 @@ export const getTrendingTokens = async (limit: number = 20): Promise<HotToken[]>
             txns: `${Math.floor(Math.random() * 50000).toLocaleString()}`,
             txnsSplit: `${Math.floor(Math.random() * 30000)} / ${Math.floor(Math.random() * 20000)}`,
             holders: `${Math.floor(Math.random() * 5000)}`,
-            totalFee: `${(Math.random() * 20).toFixed(2)} BNB`,
+            totalFee: `${(Math.random() * 20).toFixed(2)} USDT`,
             icon: '💰',
           };
         });
@@ -217,7 +217,7 @@ export const getTrendingTokens = async (limit: number = 20): Promise<HotToken[]>
             txns: txns24h > 0 ? txns24h.toLocaleString() : `${Math.floor(Math.random() * 50000).toLocaleString()}`,
             txnsSplit: `${pair.txns?.h1?.buys || 0} / ${pair.txns?.h1?.sells || 0}`,
             holders: `${Math.floor(Math.random() * 5000)}`,
-            totalFee: `${(Math.random() * 20).toFixed(2)} BNB`,
+            totalFee: `${(Math.random() * 20).toFixed(2)} USDT`,
             icon: '💰',
           };
         });

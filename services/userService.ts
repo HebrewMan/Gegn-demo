@@ -1,7 +1,7 @@
 import { User, AuthResult } from '../types';
 
 const USERS_STORAGE_KEY = 'gmgn_users_data';
-const INITIAL_BNB_BALANCE = 1000;
+const INITIAL_USDT_BALANCE = 1000000;
 
 // Read users from localStorage (simulating JSON file)
 const readUsers = (): User[] => {
@@ -57,7 +57,7 @@ export const registerWithEmail = async (email: string): Promise<AuthResult> => {
     id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
     email: email.toLowerCase(),
     authType: 'email',
-    balance: INITIAL_BNB_BALANCE,
+    balance: INITIAL_USDT_BALANCE,
     createdAt: Date.now(),
     lastLoginAt: Date.now(),
   };
@@ -98,7 +98,7 @@ export const registerWithMetaMask = async (walletAddress: string, signature: str
     id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
     walletAddress: walletAddress.toLowerCase(),
     authType: 'metamask',
-    balance: INITIAL_BNB_BALANCE,
+    balance: INITIAL_USDT_BALANCE,
     createdAt: Date.now(),
     lastLoginAt: Date.now(),
   };

@@ -21,6 +21,11 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
   const tokenFromState = (location.state as any)?.token;
   const [pairInfo, setPairInfo] = useState<TokenPair | null>(null);
   const [chartData, setChartData] = useState<any[]>([]);
+  const [currentPrice, setCurrentPrice] = useState<string>('0.003165');
+  const [priceChange5m, setPriceChange5m] = useState<number>(0);
+  const [priceChange1h, setPriceChange1h] = useState<number>(0);
+  const [priceChange6h, setPriceChange6h] = useState<number>(0);
+  const [priceChange24h, setPriceChange24h] = useState<number>(0);
   const [tradeType, setTradeType] = useState<'BUY' | 'SELL'>('BUY');
   const [panelTab, setPanelTab] = useState<'P1' | 'P2' | 'P3'>('P1');
   const [amount, setAmount] = useState('1');
@@ -30,8 +35,21 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
   // Token info from navigation state
   const tokenName = tokenFromState?.name || pairInfo?.baseToken.name || 'BOB';
   const tokenSymbol = tokenFromState?.symbol || pairInfo?.baseToken.symbol || 'BOB';
-  const tokenPrice = tokenFromState?.price || pairInfo?.priceUsd || '0.003165';
+  // Use currentPrice from K-line data, fallback to initial price
+  const tokenPrice = currentPrice ? `$${currentPrice}` : (tokenFromState?.price || pairInfo?.priceUsd || '$0.003165');
   const tokenImage = tokenFromState?.image || `https://avatar.vercel.sh/${tokenSymbol}.png?size=40`;
+  
+  // Initialize currentPrice from tokenFromState or pairInfo
+  useEffect(() => {
+    if (!currentPrice || currentPrice === '0.003165') {
+      if (tokenFromState?.price) {
+        const priceStr = tokenFromState.price.replace('$', '').trim();
+        setCurrentPrice(priceStr);
+      } else if (pairInfo?.priceUsd) {
+        setCurrentPrice(pairInfo.priceUsd);
+      }
+    }
+  }, [tokenFromState?.price, pairInfo?.priceUsd]);
 
   // Collapsible sections state
   const [isPoolInfoOpen, setIsPoolInfoOpen] = useState(true);
@@ -40,88 +58,230 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
   const [isDuplicateOpen, setIsDuplicateOpen] = useState(false);
   const [isSameNameOpen, setIsSameNameOpen] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
-    const fetchData = async () => {
-      if (!pairAddress) return;
-      setIsLoading(true);
-      
-      // Get price from token state or pair info
-      let basePrice = 0.003165;
-      if (tokenFromState?.price) {
-        // Extract price from string like "$0.0012345"
-        const priceStr = tokenFromState.price.replace('$', '').trim();
-        basePrice = parseFloat(priceStr) || 0.003165;
+  // Fetch data function
+  const fetchData = React.useCallback(async () => {
+    if (!pairAddress) return;
+    
+    // Get price from token state or pair info
+    let basePrice = 0.003165;
+    if (tokenFromState?.price) {
+      // Extract price from string like "$0.0012345"
+      const priceStr = tokenFromState.price.replace('$', '').trim();
+      basePrice = parseFloat(priceStr) || 0.003165;
+    }
+    
+    try {
+      const pairs = await getPairsByAddress(pairAddress);
+      if (pairs && pairs.length > 0) {
+        setPairInfo(pairs[0]);
+        basePrice = parseFloat(pairs[0].priceUsd) || basePrice;
+        // Update price change from API if available
+        if (pairs[0].priceChange) {
+          if (pairs[0].priceChange.m5 !== undefined) setPriceChange5m(pairs[0].priceChange.m5);
+          if (pairs[0].priceChange.h1 !== undefined) setPriceChange1h(pairs[0].priceChange.h1);
+          if (pairs[0].priceChange.h6 !== undefined) setPriceChange6h(pairs[0].priceChange.h6);
+          if (pairs[0].priceChange.h24 !== undefined) setPriceChange24h(pairs[0].priceChange.h24);
+        }
       }
       
+      // Try to get K-line data using symbol if available
+      if (tokenFromState?.symbol) {
+        try {
+          // Try to get K-line data from Binance using symbol (format: SYMBOLUSDT)
+          const tradingPair = `${tokenFromState.symbol.toUpperCase()}USDT`;
+          const klineData = await getKlineData(tradingPair, '1h', 250);
+          if (klineData && klineData.length > 0) {
+            setChartData(klineData);
+            // Update current price from the last K-line data point
+            const lastPrice = klineData[klineData.length - 1]?.close || basePrice;
+            setCurrentPrice(lastPrice.toFixed(7));
+            // Calculate price changes from K-line data
+            if (klineData.length >= 1) {
+              const price1hAgo = klineData[Math.max(0, klineData.length - 2)]?.close || lastPrice;
+              const change1h = ((lastPrice - price1hAgo) / price1hAgo) * 100;
+              setPriceChange1h(change1h);
+              setPriceChange5m(change1h * 0.083); // Approximate 5m change
+            }
+            if (klineData.length >= 6) {
+              const price6hAgo = klineData[klineData.length - 6]?.close || lastPrice;
+              const change6h = ((lastPrice - price6hAgo) / price6hAgo) * 100;
+              setPriceChange6h(change6h);
+            }
+            if (klineData.length >= 24) {
+              const price24hAgo = klineData[klineData.length - 24]?.close || lastPrice;
+              const change24h = ((lastPrice - price24hAgo) / price24hAgo) * 100;
+              setPriceChange24h(change24h);
+            }
+            return;
+          }
+        } catch (e) {
+          console.log('Failed to get K-line from Binance, trying DexScreener...');
+        }
+      }
+      
+      // Fallback to DexScreener or mock data
       try {
-        const pairs = await getPairsByAddress(pairAddress);
-        if (isMounted) {
-          if (pairs && pairs.length > 0) {
-            setPairInfo(pairs[0]);
-            basePrice = parseFloat(pairs[0].priceUsd) || basePrice;
+        const klineData = await getKlineDataFromDexScreener(pairAddress, 250);
+        if (klineData && klineData.length > 0) {
+          setChartData(klineData);
+          // Update current price from the last K-line data point
+          const lastPrice = klineData[klineData.length - 1]?.close || basePrice;
+          setCurrentPrice(lastPrice.toFixed(7));
+          // Calculate price changes from K-line data
+          if (klineData.length >= 1) {
+            const price1hAgo = klineData[Math.max(0, klineData.length - 2)]?.close || lastPrice;
+            const change1h = ((lastPrice - price1hAgo) / price1hAgo) * 100;
+            setPriceChange1h(change1h);
+            setPriceChange5m(change1h * 0.083); // Approximate 5m change
           }
-          
-          // Try to get K-line data using symbol if available
-          if (tokenFromState?.symbol) {
-            try {
-              // Try to get K-line data from Binance using symbol (format: SYMBOLUSDT)
-              const tradingPair = `${tokenFromState.symbol.toUpperCase()}USDT`;
-              const klineData = await getKlineData(tradingPair, '1h', 250);
-              if (klineData && klineData.length > 0) {
-                setChartData(klineData);
-                setIsLoading(false);
-                return;
-              }
-            } catch (e) {
-              console.log('Failed to get K-line from Binance, trying DexScreener...');
-            }
+          if (klineData.length >= 6) {
+            const price6hAgo = klineData[klineData.length - 6]?.close || lastPrice;
+            const change6h = ((lastPrice - price6hAgo) / price6hAgo) * 100;
+            setPriceChange6h(change6h);
           }
-          
-          // Fallback to DexScreener or mock data
-          try {
-            const klineData = await getKlineDataFromDexScreener(pairAddress, 250);
-            if (klineData && klineData.length > 0) {
-              setChartData(klineData);
-            } else {
-              // If no data, use mock data with correct base price
-              setChartData(getMockHistoricalData(250, basePrice));
-            }
-          } catch (e) {
-            // Use mock data with correct base price
-            setChartData(getMockHistoricalData(250, basePrice));
+          if (klineData.length >= 24) {
+            const price24hAgo = klineData[klineData.length - 24]?.close || lastPrice;
+            const change24h = ((lastPrice - price24hAgo) / price24hAgo) * 100;
+            setPriceChange24h(change24h);
           }
-          setIsLoading(false);
+        } else {
+          // If no data, use mock data with correct base price
+          const mockData = getMockHistoricalData(250, basePrice);
+          setChartData(mockData);
+          // Update current price from the last mock data point
+          const lastPrice = mockData[mockData.length - 1]?.close || basePrice;
+          setCurrentPrice(lastPrice.toFixed(7));
+          // Calculate price changes from mock data
+          if (mockData.length >= 1) {
+            const price1hAgo = mockData[Math.max(0, mockData.length - 2)]?.close || lastPrice;
+            const change1h = ((lastPrice - price1hAgo) / price1hAgo) * 100;
+            setPriceChange1h(change1h);
+            setPriceChange5m(change1h * 0.083); // Approximate 5m change
+          }
+          if (mockData.length >= 6) {
+            const price6hAgo = mockData[mockData.length - 6]?.close || lastPrice;
+            const change6h = ((lastPrice - price6hAgo) / price6hAgo) * 100;
+            setPriceChange6h(change6h);
+          }
+          if (mockData.length >= 24) {
+            const price24hAgo = mockData[mockData.length - 24]?.close || lastPrice;
+            const change24h = ((lastPrice - price24hAgo) / price24hAgo) * 100;
+            setPriceChange24h(change24h);
+          }
         }
       } catch (e) {
-        if (isMounted) {
-          // Try to get K-line data as fallback
-          try {
-            if (tokenFromState?.symbol) {
-              const tradingPair = `${tokenFromState.symbol.toUpperCase()}USDT`;
-              const klineData = await getKlineData(tradingPair, '1h', 250);
-              if (klineData && klineData.length > 0) {
-                setChartData(klineData);
-                setIsLoading(false);
-                return;
-              }
-            }
-            const klineData = await getKlineDataFromDexScreener(pairAddress, 250);
-            if (klineData && klineData.length > 0) {
-              setChartData(klineData);
-            } else {
-              setChartData(getMockHistoricalData(250, basePrice));
-            }
-          } catch (e2) {
-            setChartData(getMockHistoricalData(250, basePrice));
-          }
-          setIsLoading(false);
+        // Use mock data with correct base price
+        const mockData = getMockHistoricalData(250, basePrice);
+        setChartData(mockData);
+        // Update current price from the last mock data point
+        const lastPrice = mockData[mockData.length - 1]?.close || basePrice;
+        setCurrentPrice(lastPrice.toFixed(7));
+        // Calculate 24h price change from mock data
+        if (mockData.length >= 24) {
+          const price24hAgo = mockData[mockData.length - 24]?.close || lastPrice;
+          const change = ((lastPrice - price24hAgo) / price24hAgo) * 100;
+          setPriceChange24h(change);
         }
       }
-    };
-    fetchData();
-    return () => { isMounted = false; };
+    } catch (e) {
+      // Try to get K-line data as fallback
+      try {
+        if (tokenFromState?.symbol) {
+          const tradingPair = `${tokenFromState.symbol.toUpperCase()}USDT`;
+          const klineData = await getKlineData(tradingPair, '1h', 250);
+          if (klineData && klineData.length > 0) {
+            setChartData(klineData);
+            // Update current price from the last K-line data point
+            const lastPrice = klineData[klineData.length - 1]?.close || basePrice;
+            setCurrentPrice(lastPrice.toFixed(7));
+            // Calculate 24h price change from K-line data
+            if (klineData.length >= 24) {
+              const price24hAgo = klineData[klineData.length - 24]?.close || lastPrice;
+              const change = ((lastPrice - price24hAgo) / price24hAgo) * 100;
+              setPriceChange24h(change);
+            }
+            return;
+          }
+        }
+        const klineData = await getKlineDataFromDexScreener(pairAddress, 250);
+        if (klineData && klineData.length > 0) {
+          setChartData(klineData);
+          // Update current price from the last K-line data point
+          const lastPrice = klineData[klineData.length - 1]?.close || basePrice;
+          setCurrentPrice(lastPrice.toFixed(7));
+          // Calculate price changes from K-line data
+          if (klineData.length >= 1) {
+            const price1hAgo = klineData[Math.max(0, klineData.length - 2)]?.close || lastPrice;
+            const change1h = ((lastPrice - price1hAgo) / price1hAgo) * 100;
+            setPriceChange1h(change1h);
+            setPriceChange5m(change1h * 0.083); // Approximate 5m change
+          }
+          if (klineData.length >= 6) {
+            const price6hAgo = klineData[klineData.length - 6]?.close || lastPrice;
+            const change6h = ((lastPrice - price6hAgo) / price6hAgo) * 100;
+            setPriceChange6h(change6h);
+          }
+          if (klineData.length >= 24) {
+            const price24hAgo = klineData[klineData.length - 24]?.close || lastPrice;
+            const change24h = ((lastPrice - price24hAgo) / price24hAgo) * 100;
+            setPriceChange24h(change24h);
+          }
+        } else {
+          const mockData = getMockHistoricalData(250, basePrice);
+          setChartData(mockData);
+          // Update current price from the last mock data point
+          const lastPrice = mockData[mockData.length - 1]?.close || basePrice;
+          setCurrentPrice(lastPrice.toFixed(7));
+          // Calculate price changes from mock data
+          if (mockData.length >= 1) {
+            const price1hAgo = mockData[Math.max(0, mockData.length - 2)]?.close || lastPrice;
+            const change1h = ((lastPrice - price1hAgo) / price1hAgo) * 100;
+            setPriceChange1h(change1h);
+            setPriceChange5m(change1h * 0.083); // Approximate 5m change
+          }
+          if (mockData.length >= 6) {
+            const price6hAgo = mockData[mockData.length - 6]?.close || lastPrice;
+            const change6h = ((lastPrice - price6hAgo) / price6hAgo) * 100;
+            setPriceChange6h(change6h);
+          }
+          if (mockData.length >= 24) {
+            const price24hAgo = mockData[mockData.length - 24]?.close || lastPrice;
+            const change24h = ((lastPrice - price24hAgo) / price24hAgo) * 100;
+            setPriceChange24h(change24h);
+          }
+        }
+      } catch (e2) {
+        const mockData = getMockHistoricalData(250, basePrice);
+        setChartData(mockData);
+        // Update current price from the last mock data point
+        const lastPrice = mockData[mockData.length - 1]?.close || basePrice;
+        setCurrentPrice(lastPrice.toFixed(7));
+        // Calculate 24h price change from mock data
+        if (mockData.length >= 24) {
+          const price24hAgo = mockData[mockData.length - 24]?.close || lastPrice;
+          const change = ((lastPrice - price24hAgo) / price24hAgo) * 100;
+          setPriceChange24h(change);
+        }
+      }
+    }
   }, [pairAddress, tokenFromState?.symbol, tokenFromState?.price]);
+
+  // Initial data fetch
+  useEffect(() => {
+    setIsLoading(true);
+    fetchData().finally(() => setIsLoading(false));
+  }, [fetchData]);
+
+  // Polling: Update data every 2 seconds
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchData();
+    }, 2000); // 2 seconds
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [fetchData]);
 
   const handleActionClick = () => {
     if (!isLoggedIn) {
@@ -161,7 +321,9 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
                 </div>
                 <div className="flex items-center gap-2 text-[11px] font-mono">
                    <span className="text-yellow-500 font-bold">{tokenPrice}</span>
-                   <span className="text-green-500 font-bold">+12.5%</span>
+                   <span className={`font-bold ${priceChange24h >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                     {priceChange24h >= 0 ? '+' : ''}{priceChange24h.toFixed(2)}%
+                   </span>
                 </div>
               </div>
             </div>
@@ -206,6 +368,14 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
         <div className="flex-1 overflow-hidden bg-[#0d0e12] min-h-0 flex flex-col">
           <div className="flex-shrink-0 bg-[#0a0b0d] border-b border-gray-800/50">
             <table className="w-full text-left border-collapse min-w-[600px]">
+               <colgroup>
+                 <col style={{ width: '16.66%' }} />
+                 <col style={{ width: '16.66%' }} />
+                 <col style={{ width: '16.66%' }} />
+                 <col style={{ width: '16.66%' }} />
+                 <col style={{ width: '16.66%' }} />
+                 <col style={{ width: '16.66%' }} />
+               </colgroup>
                <thead className="text-[10px] text-gray-600 font-black uppercase">
                  <tr>
                     <th className="px-4 py-2.5">时间</th>
@@ -245,11 +415,13 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
                    const price = parseFloat(tokenPrice.replace('$', '')) || 0.003165;
                    const quantity = (Math.random() * 900 + 10).toFixed(1);
                    const total = (parseFloat(quantity) * price).toFixed(2);
+                   // Format price to 2 decimal places
+                   const formattedPrice = price.toFixed(2);
                    return (
                      <tr key={i} className="hover:bg-white/[0.03] group border-b border-white/[0.02]">
                        <td className="px-4 py-2.5 text-gray-500">{timeAgo}</td>
                        <td className={`px-4 py-2.5 font-black ${isSell ? 'text-red-500' : 'text-[#00ffa3]'}`}>{isSell ? 'SELL' : 'BUY'}</td>
-                       <td className="px-4 py-2.5 text-gray-400 font-bold">{tokenPrice}</td>
+                       <td className="px-4 py-2.5 text-gray-400 font-bold">${formattedPrice}</td>
                        <td className="px-4 py-2.5 text-gray-300">{quantity}K</td>
                        <td className={`px-4 py-2.5 text-right font-black ${isSell ? 'text-red-500' : 'text-[#00ffa3]'}`}>${total}</td>
                        <td className="px-4 py-2.5 text-right text-gray-500">0x{Math.random().toString(16).substring(2, 6)}...{Math.random().toString(16).substring(2, 6)} <User className="inline w-3 h-3 ml-1 opacity-0 group-hover:opacity-100" /></td>
@@ -267,10 +439,10 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
         
         {/* Performance & Quick Stats */}
         <div className="grid grid-cols-4 gap-[1px] bg-gray-800/50 border-b border-gray-800 p-2 flex-shrink-0">
-          <StatBox label="5m" value="+3.55%" color="text-green-500" />
-          <StatBox label="1h" value="+8.08%" color="text-green-500" />
-          <StatBox label="6h" value="+84.42%" color="text-green-500" />
-          <StatBox label="24h" value="+96.87%" color="text-green-500" />
+          <StatBox label="5m" value={`${priceChange5m >= 0 ? '+' : ''}${priceChange5m.toFixed(2)}%`} color={priceChange5m >= 0 ? 'text-green-500' : 'text-red-500'} />
+          <StatBox label="1h" value={`${priceChange1h >= 0 ? '+' : ''}${priceChange1h.toFixed(2)}%`} color={priceChange1h >= 0 ? 'text-green-500' : 'text-red-500'} />
+          <StatBox label="6h" value={`${priceChange6h >= 0 ? '+' : ''}${priceChange6h.toFixed(2)}%`} color={priceChange6h >= 0 ? 'text-green-500' : 'text-red-500'} />
+          <StatBox label="24h" value={`${priceChange24h >= 0 ? '+' : ''}${priceChange24h.toFixed(2)}%`} color={priceChange24h >= 0 ? 'text-green-500' : 'text-red-500'} />
         </div>
         
         <div className="p-3 border-b border-gray-800/50 flex flex-col gap-2 bg-[#0a0b0d] flex-shrink-0">
@@ -325,7 +497,7 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
           <div className="flex flex-col gap-2">
             <div className="flex justify-between items-end">
               <span className="text-[10px] font-black text-gray-600 uppercase">数量</span>
-              <span className="text-[10px] font-black text-gray-500 uppercase">余额: 0 BNB</span>
+              <span className="text-[10px] font-black text-gray-500 uppercase">余额: 0 USDT</span>
             </div>
             
             <div className="relative">
@@ -336,7 +508,7 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
                 className="w-full bg-[#1a1b1f] border border-gray-800 rounded px-3 py-2.5 text-sm font-black font-mono focus:outline-none focus:border-gray-700 transition-all text-gray-200"
                 placeholder="0.0"
               />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-600 uppercase">BNB</div>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-600 uppercase">USDT</div>
             </div>
 
             <div className="grid grid-cols-5 gap-1">
@@ -404,13 +576,13 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
             className="flex items-center justify-between p-3 hover:bg-white/5 cursor-pointer transition-colors"
           >
             <div className="flex items-center gap-1.5 text-[11px] font-black uppercase text-gray-300 tracking-tight">
-              {tokenSymbol}/WBNB 池信息 {isPoolInfoOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              {tokenSymbol}/USDT 池信息 {isPoolInfoOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </div>
             <Activity className="w-4 h-4 text-gray-500" />
           </div>
           {isPoolInfoOpen && (
             <div className="px-4 pb-4 flex flex-col gap-3 text-[11px] font-medium animate-in fade-in slide-in-from-top-1 duration-200">
-              <Row label="总流动性" value="$49.23K(29.21 WBNB)" color="text-gray-300" extra={<Flame className="w-3 h-3 text-orange-500 ml-1" />} />
+              <Row label="总流动性" value="$49.23K(29.21 USDT)" color="text-gray-300" extra={<Flame className="w-3 h-3 text-orange-500 ml-1" />} />
               
               <div className="grid grid-cols-3 gap-2 py-1 text-[10px] text-gray-500 font-black border-y border-gray-800/30">
                 <span>池子</span>
@@ -418,13 +590,13 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
                 <span className="text-right">价值</span>
               </div>
               <Row label={tokenSymbol} value="143.7M/0(0)" valueRight="$24.6K" />
-              <Row label="WBNB" value="29.21/0" valueRight="$24.6K" />
+              <Row label="USDT" value="29.21/0" valueRight="$24.6K" />
 
               <div className="pt-2 border-t border-gray-800/30 flex flex-col gap-2.5">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-500">开发者</span>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-gray-300 font-mono underline decoration-dotted underline-offset-4">0xf1...a86f(0.0₅234 BNB)</span>
+                    <span className="text-gray-300 font-mono underline decoration-dotted underline-offset-4">0xf1...a86f(0.0₅234 USDT)</span>
                     <Copy className="w-3 h-3 text-gray-500 cursor-pointer" />
                     <Search className="w-3 h-3 text-gray-500 cursor-pointer" />
                     <Activity className="w-3 h-3 text-gray-500 cursor-pointer" />
@@ -562,7 +734,7 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
                <SameNameItem 
                  icon="https://avatar.vercel.sh/bob1.png" 
                  name="BOB" 
-                 desc="Build On BNB" 
+                 desc="Build On BSC" 
                  lastTx="28m" 
                  mcap="$7.5M" 
                  mcapColor="text-yellow-500"
@@ -579,7 +751,7 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
                <SameNameItem 
                  icon="https://avatar.vercel.sh/bob3.png" 
                  name="BOB" 
-                 desc="Build On BNB" 
+                 desc="Build On BSC" 
                  lastTx="78d" 
                  mcap="$278.8K" 
                  mcapColor="text-yellow-500"
