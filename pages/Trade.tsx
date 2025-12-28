@@ -5,7 +5,7 @@ import {
   ArrowLeft, Share2, Activity, Settings, ChevronDown, ChevronUp, List, 
   ShieldAlert, User, ShieldCheck, Zap, Maximize2, Terminal, Info, Globe, Twitter, Send,
   MousePointer2, Flame, Lock, Eye, AlertTriangle, Boxes, Copy, ExternalLink, Search,
-  Star, Edit, MessageCircle, BarChart3, ThumbsUp, ChefHat, Crown, Clock
+  Star, Edit, MessageCircle, BarChart3, ThumbsUp, ChefHat, Crown, Clock, LayoutGrid, Camera
 } from 'lucide-react';
 import TradingChart from '../components/TradingChart';
 import { getPairsByAddress, getMockHistoricalData, getKlineDataFromDexScreener, getKlineData } from '../services/dexScreener';
@@ -32,6 +32,7 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
   const [amount, setAmount] = useState('1');
   const [isLoading, setIsLoading] = useState(true);
   const [isAuto, setIsAuto] = useState(false);
+  const [chartInterval, setChartInterval] = useState<string>('1H');
   
   // Token info from navigation state
   const tokenName = tokenFromState?.name || pairInfo?.baseToken.name || 'BOB';
@@ -89,8 +90,18 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
       if (tokenFromState?.symbol) {
         try {
           // Try to get K-line data from Binance using symbol (format: SYMBOLUSDT)
+          // Map interval to Binance format: 1s -> 1s, 30s -> 30s, 1m -> 1m, 1H -> 1h, 4H -> 4h, 1D -> 1d
+          const intervalMap: Record<string, string> = {
+            '1s': '1s',
+            '30s': '30s',
+            '1m': '1m',
+            '1H': '1h',
+            '4H': '4h',
+            '1D': '1d',
+          };
+          const binanceInterval = intervalMap[chartInterval] || '1h';
           const tradingPair = `${tokenFromState.symbol.toUpperCase()}USDT`;
-          const klineData = await getKlineData(tradingPair, '1h', 250);
+          const klineData = await getKlineData(tradingPair, binanceInterval, 250);
           if (klineData && klineData.length > 0) {
             setChartData(klineData);
             // Update current price from the last K-line data point
@@ -188,8 +199,17 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
       // Try to get K-line data as fallback
       try {
         if (tokenFromState?.symbol) {
+          const intervalMap: Record<string, string> = {
+            '1s': '1s',
+            '30s': '30s',
+            '1m': '1m',
+            '1H': '1h',
+            '4H': '4h',
+            '1D': '1d',
+          };
+          const binanceInterval = intervalMap[chartInterval] || '1h';
           const tradingPair = `${tokenFromState.symbol.toUpperCase()}USDT`;
-          const klineData = await getKlineData(tradingPair, '1h', 250);
+          const klineData = await getKlineData(tradingPair, binanceInterval, 250);
           if (klineData && klineData.length > 0) {
             setChartData(klineData);
             // Update current price from the last K-line data point
@@ -265,7 +285,7 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
         }
       }
     }
-  }, [pairAddress, tokenFromState?.symbol, tokenFromState?.price]);
+  }, [pairAddress, tokenFromState?.symbol, tokenFromState?.price, chartInterval]);
 
   // Initial data fetch
   useEffect(() => {
@@ -282,7 +302,7 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
     return () => {
       clearInterval(intervalId);
     };
-  }, [fetchData]);
+  }, [fetchData, chartInterval]);
 
   const handleActionClick = () => {
     if (!isLoggedIn) {
@@ -426,12 +446,84 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Chart Toolbar */}
+        <div className="h-10 px-4 border-b border-gray-800 flex items-center justify-between bg-[#0a0b0d] flex-shrink-0">
+          {/* Left: Time Interval Selector */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              {(['1s', '30s', '1m', '1H', '4H', '1D'] as const).map((iv) => (
+                <button
+                  key={iv}
+                  onClick={() => {
+                    setChartInterval(iv);
+                    // Trigger data refetch by updating a dependency
+                    setIsLoading(true);
+                  }}
+                  className={`px-2 py-1 text-[11px] font-bold rounded transition-colors ${
+                    chartInterval === iv
+                      ? 'bg-white text-black'
+                      : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  {iv}
+                </button>
+              ))}
+              <button className="px-1 py-1 text-gray-400 hover:text-white">
+                <ChevronDown className="w-3 h-3" />
+              </button>
+            </div>
+            
+            {/* Separator */}
+            <div className="w-px h-4 bg-gray-800 mx-1" />
+            
+            {/* Layout/Chart Type Controls */}
+            <div className="flex items-center gap-2">
+              <button className="p-1 text-gray-400 hover:text-white">
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <span className="text-[11px] text-gray-400">多图表</span>
+            </div>
+            
+            <div className="w-px h-4 bg-gray-800 mx-1" />
+            
+            <div className="flex items-center gap-2">
+              <button className="p-1 text-gray-400 hover:text-white">
+                <BarChart3 className="w-4 h-4" />
+              </button>
+              <span className="text-[11px] text-gray-400">fx</span>
+            </div>
+            
+            <div className="w-px h-4 bg-gray-800 mx-1" />
+            
+            <div className="flex items-center gap-1">
+              <span className="text-[11px] text-gray-400">显示</span>
+              <button className="px-1 py-1 text-gray-400 hover:text-white">
+                <ChevronDown className="w-3 h-3" />
+              </button>
+            </div>
+            
+            <div className="w-px h-4 bg-gray-800 mx-1" />
+            
+            <span className="text-[11px] text-gray-400">价格/市值</span>
+            
+            <div className="w-px h-4 bg-gray-800 mx-1" />
+            
+            <span className="text-[11px] text-gray-400">USD/BNB</span>
+          </div>
           
-          <div className="h-10 px-4 border-b border-gray-800 flex items-center gap-6 overflow-x-auto no-scrollbar bg-[#0a0b0d] flex-shrink-0">
-             <StatItem label="市值" value={`$${pairInfo?.marketCap?.toLocaleString() || '165.9K'}`} color="text-yellow-500" />
-             <StatItem label="流动性" value={`$${pairInfo?.liquidity?.usd.toLocaleString() || '48.2K'}`} />
-             <StatItem label="24h 成交额" value={`$${pairInfo?.volume.h24.toLocaleString() || '1.6M'}`} color="text-blue-400" />
-             <StatItem label="持有者" value="1.0K" />
+          {/* Right: Action Icons */}
+          <div className="flex items-center gap-2">
+            <button className="p-1.5 text-gray-400 hover:text-white transition-colors">
+              <Camera className="w-4 h-4" />
+            </button>
+            <button className="p-1.5 text-gray-400 hover:text-white transition-colors">
+              <Maximize2 className="w-4 h-4" />
+            </button>
+            <button className="p-1.5 text-gray-400 hover:text-white transition-colors">
+              <Settings className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
@@ -441,7 +533,11 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin }) => {
                 <div className="w-8 h-8 border-2 border-[#00ffa3] border-t-transparent rounded-full animate-spin"></div>
              </div>
            ) : (
-             <TradingChart data={chartData} symbol={tokenSymbol} />
+             <TradingChart 
+               data={chartData} 
+               symbol={tokenSymbol}
+               interval={chartInterval as any}
+             />
            )}
         </div>
 

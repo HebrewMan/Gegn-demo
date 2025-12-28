@@ -1,11 +1,33 @@
 
-import React, { useEffect, useRef } from 'react';
-import { createChart, ColorType, CrosshairMode, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
+import React, { useEffect, useRef, useState } from 'react';
+import { createChart, ColorType, CrosshairMode, CandlestickSeries, HistogramSeries, LineStyle, LineType } from 'lightweight-charts';
+import { ZoomIn, ZoomOut } from 'lucide-react';
+
+type TimeInterval = '1m' | '5m' | '15m' | '30m' | '1h' | '4h' | '1D' | '1W';
 
 interface TradingChartProps {
   data: any[];
   symbol: string;
+  interval?: TimeInterval;
+  onIntervalChange?: (interval: TimeInterval) => void;
 }
+
+// Format volume: 
+// - >= 1,000,000: show as "M" (million)
+// - >= 10,000: show as "W" (万, ten thousand)
+// - >= 1,000: show as "K" (thousand)
+// - < 1,000: show as is with 2 decimal places
+const formatVolume = (volume: number): string => {
+  if (volume >= 1000000) {
+    return `${(volume / 1000000).toFixed(2)}M`;
+  } else if (volume >= 10000) {
+    return `${(volume / 10000).toFixed(2)}W`;
+  } else if (volume >= 1000) {
+    return `${(volume / 1000).toFixed(2)}K`;
+  } else {
+    return volume.toFixed(2);
+  }
+};
 
 // Format price: 
 // - For numbers < 0: show 2 digits after the last zero (e.g., 0.0012345 -> 0.0012)
@@ -51,10 +73,17 @@ const formatPrice = (price: number): string => {
   return price.toFixed(7);
 };
 
-const TradingChart: React.FC<TradingChartProps> = ({ data, symbol }) => {
+const TradingChart: React.FC<TradingChartProps> = ({ data, symbol, interval = '1h', onIntervalChange }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<any>(null);
   const seriesRef = useRef<any>(null);
+  const highPriceLineRef = useRef<any>(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  
+  // Calculate historical high price
+  const historicalHigh = data && data.length > 0 
+    ? Math.max(...data.map(d => d.high))
+    : 0;
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -105,14 +134,20 @@ const TradingChart: React.FC<TradingChartProps> = ({ data, symbol }) => {
           borderColor: '#1e222d',
           timeVisible: true,
           secondsVisible: false,
-          barSpacing: 8,
+          barSpacing: 2, // Reduced from 8 to 2 to show more candles
+          rightOffset: 12,
+          fixLeftEdge: false,
+          fixRightEdge: false,
+          visible: true,
         },
         rightPriceScale: {
           borderColor: '#1e222d',
           scaleMargins: {
-            top: 0.2,
-            bottom: 0.2,
+            top: 0.05, // Reduced from 0.1 to show more price ticks
+            bottom: 0.05, // Reduced from 0.1 to show more price ticks
           },
+          entireTextOnly: false,
+          ticksVisible: true,
         },
         leftPriceScale: {
           visible: false,
@@ -127,15 +162,6 @@ const TradingChart: React.FC<TradingChartProps> = ({ data, symbol }) => {
         wickUpColor: '#26a69a',
         wickDownColor: '#ef5350',
         priceScaleId: 'right',
-      });
-
-      // Set localization to format prices with 7 decimal places and volume with 2 decimal places
-      chart.applyOptions({
-        localization: {
-          priceFormatter: (price: number) => {
-            return formatPrice(price);
-          },
-        },
       });
 
       // Add volume histogram series with 2 decimal places
@@ -155,24 +181,42 @@ const TradingChart: React.FC<TradingChartProps> = ({ data, symbol }) => {
           top: 0.8,
           bottom: 0,
         },
+        entireTextOnly: false,
+        ticksVisible: true,
       });
       
-      // Set price formatter to show 7 decimal places for prices
+      // Set price formatter - use a smart formatter that detects volume vs price
+      // Volume values are typically much larger than price values
+      // We'll use a threshold to distinguish: if value > 100, it's likely volume
       chart.applyOptions({
         localization: {
           priceFormatter: (price: number) => {
+            // If price is very large (> 100), it's likely volume, use volume formatter
+            // Otherwise, it's a price, use price formatter
+            if (Math.abs(price) > 100) {
+              return formatVolume(price);
+            }
             return formatPrice(price);
           },
         },
       });
-      
-      // Set volume formatter on the volume price scale
-      chart.priceScale('volume').applyOptions({
-        // Volume formatting is handled by the series priceFormat precision: 2
+
+      // Add historical high price line
+      const highPriceLine = candlestickSeries.createPriceLine({
+        price: historicalHigh,
+        color: '#71717a',
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: '历史最高价',
       });
+      highPriceLineRef.current = highPriceLine;
 
       chartRef.current = chart;
       seriesRef.current = { candlestick: candlestickSeries, volume: volumeSeries };
+
+      // Enable zoom with mouse wheel (lightweight-charts has zoom enabled by default)
+      // The chart automatically supports mouse wheel zoom and touch gestures
 
       if (data && data.length > 0) {
         const candlestickData = data.map(d => ({
@@ -182,13 +226,33 @@ const TradingChart: React.FC<TradingChartProps> = ({ data, symbol }) => {
           low: d.low,
           close: d.close,
         }));
-        const volumeData = data.map(d => ({
-          time: d.time,
-          value: d.volume || Math.abs(d.close - d.open) * 1000000, // Use volume if available, otherwise calculate
-          color: d.close >= d.open ? '#26a69a80' : '#ef535080',
-        }));
+        const volumeData = data.map(d => {
+          const volume = d.volume || Math.abs(d.close - d.open) * 1000000;
+          // Round volume to 2 decimal places to ensure proper display
+          const roundedVolume = Math.round(volume * 100) / 100;
+          return {
+            time: d.time,
+            value: roundedVolume,
+            color: d.close >= d.open ? '#26a69a80' : '#ef535080',
+          };
+        });
         candlestickSeries.setData(candlestickData);
         volumeSeries.setData(volumeData);
+        
+        // Set initial visible range to show more data (zoom out)
+        // Show approximately 100-150 candles initially
+        if (candlestickData.length > 0) {
+          const visibleRange = Math.min(150, candlestickData.length);
+          const firstVisibleTime = candlestickData[Math.max(0, candlestickData.length - visibleRange)]?.time;
+          const lastVisibleTime = candlestickData[candlestickData.length - 1]?.time;
+          
+          if (firstVisibleTime && lastVisibleTime) {
+            chart.timeScale().setVisibleRange({
+              from: firstVisibleTime,
+              to: lastVisibleTime,
+            });
+          }
+        }
       }
     };
 
@@ -225,36 +289,88 @@ const TradingChart: React.FC<TradingChartProps> = ({ data, symbol }) => {
         low: d.low,
         close: d.close,
       }));
-      const volumeData = data.map(d => ({
-        time: d.time,
-        value: d.volume || Math.abs(d.close - d.open) * 1000000,
-        color: d.close >= d.open ? '#26a69a80' : '#ef535080',
-      }));
+      const volumeData = data.map(d => {
+        const volume = d.volume || Math.abs(d.close - d.open) * 1000000;
+        // Round volume to 2 decimal places
+        const roundedVolume = Math.round(volume * 100) / 100;
+        return {
+          time: d.time,
+          value: roundedVolume,
+          color: d.close >= d.open ? '#26a69a80' : '#ef535080',
+        };
+      });
       seriesRef.current.candlestick.setData(candlestickData);
       seriesRef.current.volume.setData(volumeData);
+      
+      // Update historical high price line
+      const newHigh = Math.max(...data.map(d => d.high));
+      if (highPriceLineRef.current && newHigh !== historicalHigh) {
+        highPriceLineRef.current.applyOptions({
+          price: newHigh,
+        });
+      }
     }
-  }, [data]);
+  }, [data, historicalHigh]);
+  
+  // Handle zoom functions
+  const handleZoomIn = () => {
+    if (chartRef.current) {
+      chartRef.current.timeScale().scrollToPosition(-5, false);
+      setZoomLevel(prev => Math.min(prev + 0.1, 2));
+    }
+  };
+  
+  const handleZoomOut = () => {
+    if (chartRef.current) {
+      chartRef.current.timeScale().scrollToPosition(-5, false);
+      setZoomLevel(prev => Math.max(prev - 0.1, 0.5));
+    }
+  };
 
   return (
     <div className="w-full h-full relative overflow-hidden bg-[#0a0b0d]">
       <div ref={chartContainerRef} className="w-full h-full" />
       
-      {/* Chart Overlay Info */}
+      {/* Chart Overlay Info - Left aligned */}
       {data && data.length > 0 && (
         <div className="absolute top-3 left-4 z-10 flex flex-col gap-1 pointer-events-none select-none">
           <div className="flex items-center gap-2">
-            <span className="text-[#00ffa3] font-black text-[11px] uppercase tracking-wider">{symbol} · 1H · GMGN</span>
+            <span className="text-[#00ffa3] font-black text-[11px] uppercase tracking-wider">{symbol} · {interval.toUpperCase()} · GMGN</span>
             <div className="flex gap-2 text-[10px] font-mono text-gray-500">
-              <span>O <span className="text-gray-300">{formatPrice(data[data.length-1]?.open || 0)}</span></span>
-              <span>H <span className="text-[#26a69a]">{formatPrice(data[data.length-1]?.high || 0)}</span></span>
-              <span>L <span className="text-[#ef5350]">{formatPrice(data[data.length-1]?.low || 0)}</span></span>
-              <span>C <span className="text-gray-300">{formatPrice(data[data.length-1]?.close || 0)}</span></span>
+              <span>开 <span className="text-gray-300">{formatPrice(data[data.length-1]?.open || 0)}</span></span>
+              <span>高 <span className="text-[#26a69a]">{formatPrice(data[data.length-1]?.high || 0)}</span></span>
+              <span>低 <span className="text-[#ef5350]">{formatPrice(data[data.length-1]?.low || 0)}</span></span>
+              <span>收 <span className="text-gray-300">{formatPrice(data[data.length-1]?.close || 0)}</span></span>
             </div>
+            {historicalHigh > 0 && (
+              <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                <span>历史最高价</span>
+                <span className="text-gray-300 font-mono">{formatPrice(historicalHigh)}</span>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Watermark */}
+      {/* Zoom Controls */}
+      <div className="absolute top-3 right-4 z-20 flex items-center gap-1">
+        <button
+          onClick={handleZoomIn}
+          className="p-1.5 bg-[#1a1b1f] border border-gray-800 rounded text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+          title="放大"
+        >
+          <ZoomIn className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={handleZoomOut}
+          className="p-1.5 bg-[#1a1b1f] border border-gray-800 rounded text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+          title="缩小"
+        >
+          <ZoomOut className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Watermark - GMGN.AI */}
       <div className="absolute inset-0 flex items-center justify-center opacity-[0.02] pointer-events-none select-none z-0">
         <span className="text-[12vw] font-black tracking-[0.2em]">GMGN.AI</span>
       </div>
