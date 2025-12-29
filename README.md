@@ -6,9 +6,22 @@
 
 这是一个单机版的加密货币交易演示系统，模拟真实的代币交易流程。所有数据存储在本地（localStorage），无需后端服务器。
 
+## 🎬 演示视频
+
+<div align="center">
+  <video width="800" controls>
+    <source src="https://raw.githubusercontent.com/HebrewMan/Gegn-demo/main/public/demo.mp4" type="video/mp4">
+    您的浏览器不支持视频播放。请 <a href="https://raw.githubusercontent.com/HebrewMan/Gegn-demo/main/public/demo.mp4">点击这里下载视频</a> 查看演示。
+  </video>
+</div>
+
+> 💡 **提示**：如果视频无法播放，请 [点击这里下载](https://raw.githubusercontent.com/HebrewMan/Gegn-demo/main/public/demo.mp4) 查看演示视频。
+
+
 ## ⚠️ 重要说明
 
 **这是一个单机版应用**，所有用户数据、交易记录和持仓信息都存储在浏览器的 localStorage 中。数据不会同步到服务器，也不会与其他用户共享。
+
 
 ## 🚀 快速开始
 
@@ -32,6 +45,7 @@
 3. **访问应用**
    
    打开浏览器访问 `http://localhost:3000`（或终端显示的地址）
+
 
 ## ⚙️ 功能说明
 
@@ -146,7 +160,3 @@
 - **Cursor** - AI 驱动的代码编辑器和智能补全
 
 > 💡 这些 AI 工具在开发过程中提供了代码生成、调试、优化和文档编写等方面的帮助。
-
-## 🔗 相关链接
-
-View your app in AI Studio: https://ai.studio/apps/drive/1b_8hu16st_xJVTO-mwAg7o00rXs6ze-B
