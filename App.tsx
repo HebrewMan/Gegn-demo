@@ -112,8 +112,6 @@ const App: React.FC = () => {
         {/* Global Footer (Mimicking screenshot status bar) */}
         <footer className="h-7 bg-[#0a0b0d] border-t border-gray-800/50 flex items-center justify-between px-3 text-[10px] text-gray-500 font-medium">
           <div className="flex items-center gap-4">
-            {/* Logo with GMGN text */}
-            <Logo className="h-5" showText={true} />
              <div className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Stable 47 MS | 60 FPS</div>
              <div className="flex items-center gap-1.5">战壕</div>
              <div className="flex items-center gap-1.5">钱包追踪</div>

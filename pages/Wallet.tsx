@@ -133,15 +133,18 @@ const Wallet: React.FC<WalletProps> = ({ currentUser }) => {
       const holdingsWithCorrectPercent = await getUserHoldings(currentUser.id, priceMap, portfolioValue);
 
       // Recalculate holding percent for all tokens including USDT
+      // Filter out tokens with zero balance
       const allHoldingsWithPercent = [
         ...(balance > 0 ? [{
           ...allTokens[0],
           holdingPercent: portfolioValue > 0 ? (balance / portfolioValue) * 100 : 0,
         }] : []),
-        ...holdingsWithCorrectPercent.map(token => ({
-          ...token,
-          holdingPercent: portfolioValue > 0 ? (token.balanceUsd / portfolioValue) * 100 : 0,
-        }))
+        ...holdingsWithCorrectPercent
+          .filter(token => token.balance > 0.000001) // 过滤余额为0的代币（处理浮点数精度问题）
+          .map(token => ({
+            ...token,
+            holdingPercent: portfolioValue > 0 ? (token.balanceUsd / portfolioValue) * 100 : 0,
+          }))
       ];
       
       setTokens(allHoldingsWithPercent);
@@ -378,7 +381,7 @@ const Wallet: React.FC<WalletProps> = ({ currentUser }) => {
                     <th className="px-4 py-3">总额 USD</th>
                     <th className="px-4 py-3">利润</th>
                     <th className="px-4 py-3">时长</th>
-                    <th className="px-4 py-3">Gas费用</th>
+                    <th className="px-4 py-3">手续费</th>
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>

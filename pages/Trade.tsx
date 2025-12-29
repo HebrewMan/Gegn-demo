@@ -19,6 +19,29 @@ interface TradeProps {
   currentUser?: User | null;
 }
 
+// Helper function to truncate number to 4 decimal places (not rounding, just cutting off)
+// Example: 7.802823 -> 7.8028, 7.802877 -> 7.8028
+const truncateTo4Decimals = (num: number): number => {
+  const str = num.toString();
+  const dotIndex = str.indexOf('.');
+  if (dotIndex === -1) return num;
+  // Keep integer part + dot + 4 decimal digits
+  const truncatedStr = str.substring(0, dotIndex + 5);
+  return parseFloat(truncatedStr);
+};
+
+// Helper function to format number to 4 decimal places for display (using truncation, not rounding)
+const formatTo4Decimals = (num: number): string => {
+  const truncated = truncateTo4Decimals(num);
+  // Convert to string and ensure 4 decimal places
+  const str = truncated.toString();
+  const dotIndex = str.indexOf('.');
+  if (dotIndex === -1) return str + '.0000';
+  const decimals = str.substring(dotIndex + 1);
+  const paddedDecimals = decimals.padEnd(4, '0').substring(0, 4);
+  return str.substring(0, dotIndex + 1) + paddedDecimals;
+};
+
 const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin, currentUser }) => {
   const { pairAddress } = useParams<{ pairAddress: string }>();
   const location = useLocation();
@@ -410,17 +433,27 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin, currentUser }) =
         return;
       }
 
-      // Check USDT balance
-      if (usdAmount > userBalance) {
+      // Check USDT balance (use truncated balance for comparison to avoid rounding issues)
+      // Truncate userBalance to 4 decimals for comparison
+      // Allow a small tolerance (0.0001) to account for floating point precision when using "全部" button
+      const truncatedBalance = Math.floor(userBalance * 10000) / 10000;
+      const tolerance = 0.0001; // Small tolerance for floating point precision
+      if (usdAmount > truncatedBalance + tolerance) {
         setToast({ 
           type: 'error', 
           message: 'USDT余额不足',
-          details: `当前余额: ${userBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`
+          details: `当前余额: ${truncatedBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} USDT`
         });
         return;
       }
+      
+      // If user is trying to use all balance, adjust usdAmount to match truncated balance
+      // This ensures "全部" button works correctly
+      if (Math.abs(usdAmount - truncatedBalance) < tolerance) {
+        usdAmount = truncatedBalance;
+      }
 
-      quantity = usdAmount / price;
+      quantity = truncateTo4Decimals(usdAmount / price);
     } else {
       // SELL: input is token quantity
       quantity = parseFloat(amount);
@@ -429,17 +462,31 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin, currentUser }) =
         return;
       }
 
-      // Check token balance
-      if (quantity > tokenBalance) {
+      // Check token balance (use truncated balance to 4 decimals for comparison)
+      // Truncate tokenBalance to 4 decimals (not rounding, just cutting off)
+      const truncatedTokenBalance = truncateTo4Decimals(tokenBalance);
+      // Truncate input quantity to 4 decimals as well
+      quantity = truncateTo4Decimals(quantity);
+      
+      // Allow a small tolerance (0.0001) to account for floating point precision when using "100%" button
+      const tolerance = 0.0001;
+      if (quantity > truncatedTokenBalance + tolerance) {
         setToast({ 
           type: 'error', 
           message: `${tokenSymbol}余额不足`,
-          details: `当前余额: ${tokenBalance.toFixed(6)} ${tokenSymbol}`
+          details: `当前余额: ${formatTo4Decimals(truncatedTokenBalance)} ${tokenSymbol}`
         });
         return;
       }
+      
+      // If user is trying to sell all tokens, adjust quantity to match truncated balance
+      // This ensures "100%" button works correctly
+      if (Math.abs(quantity - truncatedTokenBalance) < tolerance) {
+        quantity = truncatedTokenBalance;
+      }
 
       usdAmount = quantity * price;
+      // Note: For SELL, fee is deducted from usdAmount, so no USDT balance check is needed
     }
 
     setIsTrading(true);
@@ -464,18 +511,22 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin, currentUser }) =
         const newTokenBalance = await getUserTokenBalance(currentUser.id, tokenAddress);
         setTokenBalance(newTokenBalance);
         
-        // Show success message
+        // Show success message with fee information
+        const fee = result.trade?.gasFee || 0;
         if (tradeType === 'BUY') {
+          const actualAmount = usdAmount - fee;
+          const actualQuantity = result.trade?.quantity || quantity;
           setToast({ 
             type: 'success', 
             message: '买入成功',
-            details: `使用USDT: $${usdAmount.toFixed(2)}\n获得数量: ${quantity.toFixed(6)} ${tokenSymbol}\nGas费用: $${result.trade?.gasFee.toFixed(4) || '0.0000'}`
+            details: `使用USDT: $${usdAmount.toFixed(2)}\n手续费: $${fee.toFixed(4)}\n实际购买: $${actualAmount.toFixed(2)}\n获得数量: ${actualQuantity.toFixed(4)} ${tokenSymbol}`
           });
         } else {
+          const actualAmount = usdAmount - fee;
           setToast({ 
             type: 'success', 
             message: '卖出成功',
-            details: `卖出数量: ${quantity.toFixed(6)} ${tokenSymbol}\n获得USDT: $${usdAmount.toFixed(2)}\nGas费用: $${result.trade?.gasFee.toFixed(4) || '0.0000'}`
+            details: `卖出数量: ${quantity.toFixed(4)} ${tokenSymbol}\n手续费: $${fee.toFixed(4)}\n实际获得: $${actualAmount.toFixed(2)} USDT`
           });
         }
         
@@ -588,7 +639,7 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin, currentUser }) =
                 </div>
 
                 {/* Market cap - independent element, calculated from current price */}
-                <div className="text-2xl font-bold text-white flex-shrink-0">
+                <div className="text-[20px] ml-[30px] mr-[10px] font-bold text-white flex-shrink-0">
                   ${calculatedMarketCap >= 1000 ? `${(calculatedMarketCap / 1000).toFixed(2)}M` : `${calculatedMarketCap.toFixed(1)}K`}
                 </div>
 
@@ -883,7 +934,7 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin, currentUser }) =
             <div className="ml-auto text-[10px] font-black text-gray-500 uppercase">
               {tradeType === 'BUY' 
                 ? `余额: ${userBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`
-                : `余额: ${tokenBalance.toFixed(6)} ${tokenSymbol}`
+                : `余额: ${formatTo4Decimals(tokenBalance)} ${tokenSymbol}`
               }
             </div>
           </div>
@@ -898,10 +949,24 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin, currentUser }) =
                 type="text" 
                 value={amount}
                 onChange={(e) => {
-                  const value = e.target.value;
+                  let value = e.target.value;
                   // Allow only numbers and decimal point
                   if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    // If user is typing, allow it but limit to 4 decimal places
+                    const dotIndex = value.indexOf('.');
+                    if (dotIndex !== -1 && value.length > dotIndex + 5) {
+                      // Truncate to 4 decimal places while typing
+                      value = value.substring(0, dotIndex + 5);
+                    }
                     setAmount(value);
+                  }
+                }}
+                onBlur={(e) => {
+                  // When input loses focus, format to 4 decimals (truncate, not round)
+                  const numValue = parseFloat(e.target.value);
+                  if (!isNaN(numValue)) {
+                    const formatted = formatTo4Decimals(numValue);
+                    setAmount(formatted);
                   }
                 }}
                 className="w-full bg-[#1a1b1f] border border-gray-800 rounded px-3 py-2.5 text-sm font-black font-mono focus:outline-none focus:border-gray-700 transition-all text-gray-200"
@@ -926,7 +991,12 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin, currentUser }) =
                     </button>
                   ))}
                   <button 
-                    onClick={() => setAmount(userBalance.toFixed(2))}
+                    onClick={() => {
+                      // Show full balance in input, but use a slightly smaller value to account for fee
+                      // Use truncated balance to avoid floating point issues
+                      const truncatedBalance = Math.floor(userBalance * 10000) / 10000;
+                      setAmount(truncatedBalance.toFixed(2));
+                    }}
                     className="py-1.5 rounded bg-gray-800/30 border border-gray-800/50 text-[10px] font-black text-gray-500 hover:border-gray-600 hover:text-white transition-all"
                   >
                     全部
@@ -936,7 +1006,12 @@ const Trade: React.FC<TradeProps> = ({ isLoggedIn, onOpenLogin, currentUser }) =
                 // SELL: Show percentage buttons (10%, 25%, 50%, 100%)
                 <>
                   {[0.1, 0.25, 0.5, 1].map(ratio => {
-                    const val = (tokenBalance * ratio).toFixed(6);
+                    // Use truncated balance to 4 decimals to avoid floating point issues
+                    const truncatedTokenBalance = truncateTo4Decimals(tokenBalance);
+                    const calculatedAmount = truncatedTokenBalance * ratio;
+                    // Truncate the calculated amount to 4 decimals (not rounding)
+                    const truncatedAmount = truncateTo4Decimals(calculatedAmount);
+                    const val = formatTo4Decimals(truncatedAmount);
                     return (
                       <button 
                         key={ratio}

@@ -137,6 +137,16 @@
 - 页面位于 `pages/` 目录
 - 数据管理在 `data/database.ts` 中统一处理
 
+## 🤖 AI 工具
+
+本项目在开发过程中使用了以下 AI 工具辅助开发：
+
+- **ChatGPT** - 代码生成、问题解答和架构设计
+- **Google Gemini** - 代码审查、优化建议和文档编写
+- **Cursor** - AI 驱动的代码编辑器和智能补全
+
+> 💡 这些 AI 工具在开发过程中提供了代码生成、调试、优化和文档编写等方面的帮助。
+
 ## 🔗 相关链接
 
 View your app in AI Studio: https://ai.studio/apps/drive/1b_8hu16st_xJVTO-mwAg7o00rXs6ze-B

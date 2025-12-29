@@ -14,6 +14,14 @@ import {
 const TRADES_STORAGE_KEY = 'gmgn_trades_data';
 const HOLDINGS_STORAGE_KEY = 'gmgn_holdings_data';
 
+// Helper function to truncate balance to avoid rounding issues
+// Truncates to specified decimal places by cutting off extra digits (not rounding)
+// This prevents "insufficient balance" errors caused by rounding
+const truncateBalance = (balance: number, decimals: number = 4): number => {
+  const multiplier = Math.pow(10, decimals);
+  return Math.floor(balance * multiplier) / multiplier;
+};
+
 export interface Trade {
   id: string;
   userId: string;
@@ -109,29 +117,44 @@ export const executeTrade = async (
     }
 
     // Use provided quantity or calculate from usdAmount
-    const finalQuantity = quantity !== undefined ? quantity : (usdAmount / price);
-    const gasFee = Math.random() * 0.1 + 0.01; // Random gas fee between 0.01 and 0.11
+    // Truncate quantity to avoid floating point precision issues
+    const finalQuantity = quantity !== undefined 
+      ? truncateBalance(quantity, 8) // Token quantities can have more decimals
+      : truncateBalance(usdAmount / price, 8);
+    const fee = Math.random() * 0.1 + 0.01; // Random fee between 0.01 and 0.11 (手续费)
+    
+    // Variables to store actual amounts after fee deduction
+    let actualUsdAmount: number;
+    let actualQuantity: number;
 
     if (type === 'BUY') {
-      // Check if user has enough USDT
-      if (userRecord.balance < usdAmount + gasFee) {
+      // For BUY: fee is deducted from usdAmount, so user pays usdAmount and gets (usdAmount - fee) worth of tokens
+      // Check if user has enough USDT (only need to check usdAmount, fee is included)
+      if (userRecord.balance < usdAmount) {
         return { success: false, message: 'USDT余额不足' };
       }
 
-      // Deduct USDT from user balance
-      userRecord.balance -= (usdAmount + gasFee);
+      // Deduct USDT from user balance (fee is already included in usdAmount)
+      // Truncate balance to avoid rounding issues that could cause "insufficient balance" errors
+      userRecord.balance = truncateBalance(userRecord.balance - usdAmount);
       await updateUserBalance(userId, userRecord.balance);
+      
+      // Adjust usdAmount to subtract fee for actual token purchase
+      actualUsdAmount = truncateBalance(usdAmount - fee);
+      
+      // Recalculate quantity based on actual amount (after fee deduction)
+      actualQuantity = truncateBalance(actualUsdAmount / price, 8);
       
       // Update or create holding
       const holdings = await getHoldingRecordsByUserId(userId);
       let holding = holdings.find(
         h => h.token_address.toLowerCase() === tokenAddress.toLowerCase()
       );
-
+      
       if (holding) {
         // Update existing holding
-        const totalQuantity = holding.quantity + finalQuantity;
-        const totalBuyUsd = holding.total_buy_usd + usdAmount;
+        const totalQuantity = truncateBalance(holding.quantity + actualQuantity, 8);
+        const totalBuyUsd = truncateBalance(holding.total_buy_usd + actualUsdAmount);
         holding.average_buy_price = totalBuyUsd / totalQuantity;
         holding.quantity = totalQuantity;
         holding.total_buy_usd = totalBuyUsd;
@@ -145,9 +168,9 @@ export const executeTrade = async (
           token_symbol: tokenSymbol,
           token_name: tokenName,
           token_image: tokenImage,
-          quantity: finalQuantity,
+          quantity: actualQuantity,
           average_buy_price: price,
-          total_buy_usd: usdAmount,
+          total_buy_usd: truncateBalance(actualUsdAmount),
           total_sell_usd: 0,
           first_buy_time: Date.now(),
           last_active_time: Date.now(),
@@ -165,17 +188,25 @@ export const executeTrade = async (
         return { success: false, message: '代币余额不足' };
       }
 
-      // Add USDT to user balance
-      userRecord.balance += (usdAmount - gasFee);
+      // For SELL: fee is deducted from usdAmount received
+      // User receives (usdAmount - fee) USDT
+      actualUsdAmount = truncateBalance(usdAmount - fee);
+      actualQuantity = finalQuantity; // For SELL, quantity doesn't change
+      
+      // Add USDT to user balance (fee is already deducted from usdAmount)
+      // Truncate balance to avoid rounding issues
+      userRecord.balance = truncateBalance(userRecord.balance + actualUsdAmount);
       await updateUserBalance(userId, userRecord.balance);
       
       // Update holding
-      holding.quantity -= finalQuantity;
-      holding.total_sell_usd += usdAmount;
+      holding.quantity = truncateBalance(holding.quantity - finalQuantity, 8);
+      holding.total_sell_usd = truncateBalance(holding.total_sell_usd + actualUsdAmount);
       holding.last_active_time = Date.now();
 
-      // Remove holding if quantity is zero
-      if (holding.quantity <= 0) {
+      // Remove holding if quantity is zero or very close to zero (handle floating point precision issues)
+      // Use a small threshold to handle floating point precision errors
+      const MIN_QUANTITY_THRESHOLD = 0.000001;
+      if (holding.quantity < MIN_QUANTITY_THRESHOLD) {
         await removeHoldingRecord(userId, tokenAddress);
       } else {
         await upsertHoldingRecord(holding);
@@ -203,10 +234,10 @@ export const executeTrade = async (
       quote_token: 'USDT',
       side: type,
       price: price,
-      base_amount: finalQuantity,
-      quote_amount: usdAmount,
+      base_amount: type === 'BUY' ? actualQuantity : finalQuantity,
+      quote_amount: type === 'BUY' ? actualUsdAmount : actualUsdAmount, // Use actual amount after fee
       timestamp: Math.floor(Date.now() / 1000), // Unix timestamp
-      gas_fee: gasFee,
+      gas_fee: fee, // 手续费
       token_address: tokenAddress,
       token_name: tokenName,
       token_image: tokenImage,
@@ -216,6 +247,7 @@ export const executeTrade = async (
     await addTradeRecord(tradeRecord);
 
     // Return in old format for compatibility
+    // Use actual values after fee deduction
     const trade: Trade = {
       id: tradeRecord.trade_id,
       userId,
@@ -225,10 +257,10 @@ export const executeTrade = async (
       tokenName,
       tokenImage,
       price,
-      quantity: finalQuantity,
-      totalUsd: usdAmount,
+      quantity: type === 'BUY' ? actualQuantity : finalQuantity,
+      totalUsd: type === 'BUY' ? actualUsdAmount : actualUsdAmount,
       timestamp: tradeRecord.timestamp * 1000, // Convert back to milliseconds
-      gasFee,
+      gasFee: fee, // 手续费
     };
 
     return {
@@ -245,7 +277,9 @@ export const executeTrade = async (
 // Get user holdings (using new JSON format)
 export const getUserHoldings = async (userId: string, currentPrices: Record<string, number>, totalPortfolioValue?: number): Promise<WalletToken[]> => {
   const holdings = await getHoldingRecordsByUserId(userId);
-  const userHoldings = holdings.filter(h => h.quantity > 0);
+  // Filter out holdings with zero or near-zero quantity (handle floating point precision)
+  const MIN_QUANTITY_THRESHOLD = 0.000001;
+  const userHoldings = holdings.filter(h => h.quantity > MIN_QUANTITY_THRESHOLD);
 
   // Get all trades for this user to count transactions per token
   const { getTradesByUserId } = await import('../data/database');
@@ -417,7 +451,8 @@ export const getUserBalance = async (userId: string): Promise<number> => {
   try {
     const { getUserById } = await import('../data/database');
     const userRecord = await getUserById(userId);
-    return userRecord?.balance || 0;
+    // Truncate balance to avoid rounding issues
+    return userRecord?.balance ? truncateBalance(userRecord.balance) : 0;
   } catch (error) {
     console.error('Error getting user balance:', error);
     return 0;
@@ -431,7 +466,8 @@ export const getUserTokenBalance = async (userId: string, tokenAddress: string):
     const holding = holdings.find(
       h => h.token_address.toLowerCase() === tokenAddress.toLowerCase()
     );
-    return holding?.quantity || 0;
+    // Truncate balance to avoid rounding issues
+    return holding?.quantity ? truncateBalance(holding.quantity, 8) : 0;
   } catch (error) {
     console.error('Error getting user token balance:', error);
     return 0;
